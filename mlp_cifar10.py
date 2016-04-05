@@ -73,7 +73,7 @@ def evaluate(X, l=2, p=0.5):
     for i in range(T):
         probs.append(model.predict(np.array(X)))
     pred_mean = np.mean(probs, axis=0)
-    pred_variance = np.var(probs, axis=0)
+    pred_variance = np.std(probs, axis=0)
     #tau = l**2 * (1 - p) / (2 * N * rg.l2)
     #pred_variance += tau**-1
     return pred_mean, pred_variance
