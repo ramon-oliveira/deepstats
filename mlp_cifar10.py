@@ -64,7 +64,7 @@ model.add(MyDropout(0.5))
 model.add(Dense(1, activation='sigmoid', W_regularizer=rg))
 
 #sgd = SGD(lr=0.01, momentum=0.9);
-model.compile(loss='categorical_crossentropy', optimizer='adadelta')
+model.compile(loss='binary_crossentropy', optimizer='sgd')
 T = 50
 
 
