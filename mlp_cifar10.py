@@ -51,8 +51,8 @@ X_test /= 255
 
 X_train = np.delete(X_train, indexes, axis=0)
 y_train = np.delete(y_train, indexes, axis=0)
-#y_train = y_train / 5.0
-y_train = np_utils.to_categorical(y_train, nb_classes)
+y_train = y_train / 5.0
+#y_train = np_utils.to_categorical(y_train, nb_classes)
 
 print(X_train.shape[0], 'train samples')
 print(X_test.shape[0], 'test samples')
