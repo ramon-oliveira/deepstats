@@ -1,34 +1,90 @@
-# from keras.datasets import mnist
+from keras.datasets import mnist
+from keras.utils import np_utils
 import tensorflow as tf
 import numpy as np
 
-#(X_train, y_train), (X_test, y_test) = mnist.load_data()
-
-in_dim = 1
+in_dim = 784
 out_dim = 1
-hidden = 1
+hidden = 512
+
+(X_train, y_train), (X_test, y_test) = mnist.load_data()
+X_train = X_train.reshape(60000, 784)
+X_test = X_test.reshape(10000, 784)
+X_train = X_train.astype('float32')
+X_test = X_test.astype('float32')
+X_train /= 255
+X_test /= 255
+
+indexes29 = [i for i, c in enumerate(y_train) if c >= 2]
+indexes01 = [i for i, c in enumerate(y_train) if c < 2]
+#test_indexes29 = [i for i, c in enumerate(y_test) if c >= 2]
+#test_indexes01 = [i for i, c in enumerate(y_test) if c < 2]
+X_train = np.delete(X_train, indexes29, axis=0)
+y_train = np.delete(y_train, indexes29, axis=0)
+y_train = y_train.reshape([len(y_train), 1])
+#y_train = np_utils.to_categorical(y_train, out_dim)
 
 
-X_batch = tf.placeholder(tf.float32, [None, in_dim])
-y_batch = tf.placeholder(tf.float32, [None, out_dim])
+X_batch = tf.placeholder(tf.float32, [None, in_dim], name='X_batch')
+y_batch = tf.placeholder(tf.float32, [None, out_dim], name='y_batch')
 
-mean0 = [[tf.Variable(0, dtype=tf.float32) for j in range(hidden)] for i in range(in_dim)]
-stddev0 = [[tf.Variable(0, dtype=tf.float32) for j in range(hidden)] for i in range(in_dim)]
-W0 = tf.Variable([in_dim, hidden], dtype=tf.float32)
-b0 = tf.Variable([hidden, 1], dtype=tf.float32)
+initial_m0 = tf.zeros([in_dim, hidden], dtype=tf.float32)
+mean0 = tf.Variable(initial_m0, name='mean0')
+initial_s0 = tf.ones([in_dim, hidden], dtype=tf.float32)
+stddev0 = tf.Variable(initial_s0, name='stddev0')
+initial_b0 = tf.constant(0.1, shape=[hidden])
+b0 = tf.Variable(initial_b0, dtype=tf.float32, name='b0')
+W0 = tf.random_normal([in_dim, hidden], dtype=tf.float32, name='W0')
 
+initial_m1 = tf.zeros([hidden, out_dim], dtype=tf.float32)
+mean1 = tf.Variable(initial_m1, name='mean1')
+initial_s1 = tf.ones([hidden, out_dim], dtype=tf.float32)
+stddev1 = tf.Variable(initial_s1, name='stddev1')
+initial_b1 = tf.constant(0.1, shape=[out_dim])
+b1 = tf.Variable(initial_b1, dtype=tf.float32, name='b1')
+W1 = tf.random_normal([hidden, out_dim], dtype=tf.float32, name='W1')
 
-normals = [[tf.random_normal(0, mean=mean0[i][j], stddev=stddev0[i][j]) for j in range(hidden)] 
-           for i in range(in_dim)]
+# * is elementwise operator
+ff0 = tf.nn.relu(tf.matmul(X_batch, W0*stddev0 + mean0) + b0)
+ff1 = tf.matmul(ff0, W1*stddev1 + mean1) + b1
+y_out = tf.nn.sigmoid(ff1)
 
-W0.assign(normals)
+#cost = tf.nn.sigmoid_cross_entropy_with_logits(ff1, y_batch)
+cost = -y_batch*tf.clip_by_value(tf.log(y_out), -1e6, 1e6) - \
+       (1.0 - y_batch)*tf.clip_by_value(tf.log(1.0 - y_out), -1e6, 1e6) 
+#cost = y_out - y_out*y_batch + tf.log(1 + tf.exp(-y_out))
+       
+#cost = y_batch*-tf.log(y_out) + (1.0 - y_batch)*-tf.log(1.0 - y_out)
 
-#W1 = tf.random_normal([512, out_dim], mean=0, stddev=1)
-#b1 = tf.random_normal([out_dim, 1], mean=0, stddev=1)
+KL0 = (mean0**2)/2.0 + (stddev0**2 - 1.0 - tf.log(stddev0**2))/2.0
+KL1 = (mean1**2)/2.0 + (stddev1**2 - 1.0 - tf.log(stddev1**2))/2.0
 
-#y_out = tf.nn.sigmoid(tf.matmul(tf.nn.relu(tf.matmul(X_batch, W0) + b0), W1) + b1)
+KL = tf.reduce_sum(KL0) + tf.reduce_sum(KL1)
 
-# cost = y_batch*-tf.log(tf.sigmoid(y_out)) + (1 - y_batch)*-tf.log(1 - tf.sigmoid(y_out)) 
-#cost = tf.nn.sigmoid_cross_entropy_with_logits(y_out, y_batch)
+loss = KL + cost
 
-# KL = 
+ws = [mean0, stddev0, b0, mean1, stddev1, b1]
+train = tf.train.GradientDescentOptimizer(0.1).minimize(loss, var_list=ws)
+
+init = tf.initialize_all_variables()
+
+sess = tf.Session()
+sess.run(init)
+
+for i in range(100):
+    if i % 10000 == 0:
+        o, oi, c, k, l = sess.run([y_out, ff1, cost, KL, loss], feed_dict={
+            X_batch: X_train[:1], y_batch: y_train[:1]})
+        print('Step', i+1)
+        print('output:')
+        print(o, oi, y_train[0])
+        print('cost:', c)
+        print('KL:', k)
+        print('loss:', l)
+    sess.run(train, feed_dict={X_batch: X_train[i:i+1], 
+                               y_batch: y_train[i:i+1]})
+    m0, s0 = sess.run([mean0, stddev0])
+    print('mean0 sum:', np.sum(m0) ,'stddev0 sum:', np.sum(s0))
+
+#sess = tf.InteractiveSession()
+sess.close()
