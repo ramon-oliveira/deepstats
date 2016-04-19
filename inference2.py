@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Apr 19 13:28:03 2016
+
+@author: roliveira
+"""
+
 from keras.datasets import mnist
 from keras.utils import np_utils
 import tensorflow as tf
