@@ -130,7 +130,7 @@ def accuracy_test():
     return sm/len(y_test_01)
 
 #saver = tf.train.Saver()
-for epoch in range(5):
+for epoch in range(3):
     print('Epoch:', epoch+1)
     for i in range(0, len(X_train)-mod, batch_size):
         sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
@@ -138,8 +138,52 @@ for epoch in range(5):
     #saver.save(sess, 'checkpoint.ckpt') #-epoch-'+str(epoch+1)+'.ckpt')
     #print('\t* accuracy train:', accuracy_train())
     print('\t* accuracy test:', accuracy_test())
-    for i in range(10):
-        stats_class(i)
+
+
+# Uncertainty prediction
+test_pred_mean = {x:[] for x in range(10)}
+test_pred_std = {x:[] for x in range(10)}
+test_entropy_bayesian_v1 = {x:[] for x in range(10)}
+test_entropy_bayesian_v2 = {x:[] for x in range(10)}
+test_entropy_deterministic = {x:[] for x in range(10)}
+test_variation_ratio = {x:[] for x in range(10)}
+
+for i, x in enumerate(X_test):
+    xin = np.array([x]*batch_size)
+    outs = sess.run(y_out_soft,feed_dict={X_batch: xin})
+    pred_mean = outs.mean(axis=0)[1]
+    pred_std = outs.std()
+    
+    test_pred_mean[y_test[i]].append(pred_std)
+    test_pred_std[y_test[i]].append(pred_mean)
+    
+# Anomaly detection
+# by classical prediction entropy
+inside_labels = [0, 1]
+def anomaly_detection(anomaly_score_dict, name):
+    threshold = np.linspace(0, 1.0, 10000)
+    acc = {}
+    for t in threshold:
+        tp = 0.0
+        tn = 0.0
+        for l in anomaly_score_dict:
+            if l in inside_labels:
+                tp += (np.array(anomaly_score_dict[l]) < t).mean()
+            else:
+                tn += (np.array(anomaly_score_dict[l]) >= t).mean()
+        tp /= len(inside_labels)
+        tn /= 10.0 - len(inside_labels)
+        bal_acc = (tp + tn)/2.0
+        f1_score = 2.0*tp/(2.0 + tp - tn)
+        acc[t] = [bal_acc, f1_score, tp, tn]
+        
+    print("{}\tscore\tthreshold\tTP\tTN".format(name))
+    sorted_acc = sorted(acc.items(), key= lambda x : x[1][0], reverse = True)
+    print("\tbalanced acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
+    sorted_acc = sorted(acc.items(), key= lambda x : x[1][1], reverse = True)
+    print("\tf1 score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
+
+anomaly_detection(test_pred_std, "Standard deviation")
 
 sess = tf.InteractiveSession()
 sess.close()
