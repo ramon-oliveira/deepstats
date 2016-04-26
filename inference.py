@@ -7,7 +7,7 @@ np.random.seed(42)
 random.seed(42)
 
 in_dim = 784
-out_dim = 9
+out_dim = 2
 hidden = 512
 batch_size = 8
 
@@ -86,6 +86,7 @@ sess.run(init)
 
 saver = tf.train.Saver()
 
+
 def plot_class(c):
     ids_c = [i for i, t in enumerate(y_test) if t == c]
     X = X_test[ids_c]
@@ -93,7 +94,6 @@ def plot_class(c):
     for x in X:
         xin = np.array([x]*batch_size)
         outs = sess.run(y_out_soft,feed_dict={X_batch: xin})
-        
         
 
 def accuracy_train():
@@ -125,12 +125,13 @@ def accuracy_test():
     sm = sum(t == p for t, p in zip(trues, preds))
     return sm/len(y_test_01)
 
-for epoch in range(20):
+
+for epoch in range(5):
     print('Epoch:', epoch+1)
     for i in range(0, len(X_train)-mod, batch_size):
         sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
                                    y_batch: y_train[i:i+batch_size]})
-    saver.save(sess, 'checkpoint-epoch-'+str(epoch+1)+'.ckpt')
+    saver.save(sess, 'checkpoint.ckpt') #-epoch-'+str(epoch+1)+'.ckpt')
     print('\t* accuracy train:', accuracy_train())
     print('\t* accuracy test:', accuracy_test())
 
