@@ -23,6 +23,7 @@ indexes29 = [i for i, c in enumerate(y_train) if c >= out_dim]
 indexes01 = [i for i, c in enumerate(y_train) if c < out_dim]
 X_train = np.delete(X_train, indexes29, axis=0)
 X_train = X_train.reshape(len(X_train), in_dim, 1)
+X_test = X_test.reshape(len(X_test), in_dim, 1)
 y_train = np.delete(y_train, indexes29, axis=0)
 y_train = np_utils.to_categorical(y_train, out_dim)
 
