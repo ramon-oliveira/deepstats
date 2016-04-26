@@ -9,7 +9,7 @@ random.seed(42)
 in_dim = 784
 out_dim = 2
 hidden = 512
-batch_size = 8
+batch_size = 16
 
 (X_train, y_train), (X_test, y_test) = mnist.load_data()
 X_train = X_train.reshape(60000, 784)
@@ -79,22 +79,26 @@ loss = total_cost + KL
 vl = [mean0, stddev0, b0, mean1, stddev1, b1]
 train = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
 
-init = tf.initialize_all_variables()
 
+init = tf.initialize_all_variables()
 sess = tf.Session()
 sess.run(init)
 
-saver = tf.train.Saver()
 
-
-def plot_class(c):
+def stats_class(c):
     ids_c = [i for i, t in enumerate(y_test) if t == c]
     X = X_test[ids_c]
-    preds = []
+    preds_std = []
     for x in X:
         xin = np.array([x]*batch_size)
         outs = sess.run(y_out_soft,feed_dict={X_batch: xin})
-        
+        #pred_mean = outs.mean(axis=0)
+        pred_std = outs.std(axis=0)
+        preds_std.append(pred_std[0])
+    preds_std = np.array(preds_std)
+    print('Class', c)
+    print(' '*4, 'mean std:', preds_std.mean())        
+
 
 def accuracy_train():
     trues = np.argmax(y_train, 1)
@@ -125,15 +129,17 @@ def accuracy_test():
     sm = sum(t == p for t, p in zip(trues, preds))
     return sm/len(y_test_01)
 
-
+#saver = tf.train.Saver()
 for epoch in range(5):
     print('Epoch:', epoch+1)
     for i in range(0, len(X_train)-mod, batch_size):
         sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
                                    y_batch: y_train[i:i+batch_size]})
-    saver.save(sess, 'checkpoint.ckpt') #-epoch-'+str(epoch+1)+'.ckpt')
-    print('\t* accuracy train:', accuracy_train())
+    #saver.save(sess, 'checkpoint.ckpt') #-epoch-'+str(epoch+1)+'.ckpt')
+    #print('\t* accuracy train:', accuracy_train())
     print('\t* accuracy test:', accuracy_test())
+    for i in range(10):
+        stats_class(i)
 
 sess = tf.InteractiveSession()
 sess.close()
