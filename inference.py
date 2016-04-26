@@ -9,7 +9,7 @@ random.seed(42)
 in_dim = 784
 out_dim = 2
 hidden = 512
-batch_size = 16
+batch_size = 8
 
 (X_train, y_train), (X_test, y_test) = mnist.load_data()
 X_train = X_train.reshape(60000, 784)
@@ -131,7 +131,7 @@ def accuracy_test():
     return sm/len(y_test_01)
 
 #saver = tf.train.Saver()
-for epoch in range(3):
+for epoch in range(1):
     print('Epoch:', epoch+1)
     for i in range(0, len(X_train)-mod, batch_size):
         sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
@@ -153,11 +153,15 @@ for i, x in enumerate(X_test):
     xin = np.array([x]*batch_size)
     outs = sess.run(y_out_soft,feed_dict={X_batch: xin})
     pred_mean = outs.mean(axis=0)[1]
-    pred_std = outs.std()
+    pred_std = outs.std(axis=0)[1]
     
-    test_pred_mean[y_test[i]].append(pred_std)
-    test_pred_std[y_test[i]].append(pred_mean)
-    
+    test_pred_mean[y_test[i]].append(pred_mean)
+    test_pred_std[y_test[i]].append(pred_std)
+
+print(test_pred_std[0][:10]) 
+print(test_pred_std[1][:10]) 
+print(test_pred_std[2][:10]) 
+print(test_pred_std[3][:10]) 
 # Anomaly detection
 # by classical prediction entropy
 inside_labels = [0, 1]
