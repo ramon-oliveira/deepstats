@@ -136,10 +136,10 @@ for epoch in range(5):
     for i in range(0, len(X_train)-mod, batch_size):
         sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
                                    y_batch: y_train[i:i+batch_size]})
-        l, tl, KL = sess.run([loss, total_cost, KL], feed_dict={X_batch: X_train[i:i+batch_size], 
+        l, tl, kl_ = sess.run([loss, total_cost, KL], feed_dict={X_batch: X_train[i:i+batch_size], 
                                                     y_batch: y_train[i:i+batch_size]}) 
                                                     
-        print('loss:', l, 'KL:', KL, 'total:', tl)
+        print('loss:', l, 'KL:', kl_, 'total:', tl)
     #saver.save(sess, 'checkpoint.ckpt') #-epoch-'+str(epoch+1)+'.ckpt')
     #print('\t* accuracy train:', accuracy_train())
     print('\t* accuracy test:', accuracy_test())
@@ -170,7 +170,7 @@ print(test_pred_std[3][:10])
 # by classical prediction entropy
 inside_labels = [0, 1]
 def anomaly_detection(anomaly_score_dict, name):
-    threshold = np.linspace(0, 1.0, 10000)
+    threshold = np.logspace(-10.0, 1.0, 1000)
     acc = {}
     for t in threshold:
         tp = 0.0
