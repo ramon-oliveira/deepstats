@@ -7,7 +7,7 @@ np.random.seed(42)
 random.seed(42)
 
 in_dim = 784
-out_dim = 2
+out_dim = 9
 hidden = 512
 batch_size = 8
 
@@ -19,8 +19,8 @@ X_test = X_test.astype('float32')
 X_train /= 255
 X_test /= 255
 
-indexes29 = [i for i, c in enumerate(y_train) if c >= 2]
-indexes01 = [i for i, c in enumerate(y_train) if c < 2]
+indexes29 = [i for i, c in enumerate(y_train) if c >= out_dim]
+indexes01 = [i for i, c in enumerate(y_train) if c < out_dim]
 X_train = np.delete(X_train, indexes29, axis=0)
 X_train = X_train.reshape(len(X_train), in_dim, 1)
 y_train = np.delete(y_train, indexes29, axis=0)
@@ -84,6 +84,18 @@ init = tf.initialize_all_variables()
 sess = tf.Session()
 sess.run(init)
 
+saver = tf.train.Saver()
+
+def plot_class(c):
+    ids_c = [i for i, t in enumerate(y_test) if t == c]
+    X = X_test[ids_c]
+    preds = []
+    for x in X:
+        xin = np.array([x]*batch_size)
+        outs = sess.run(y_out_soft,feed_dict={X_batch: xin})
+        
+        
+
 def accuracy_train():
     trues = np.argmax(y_train, 1)
     preds = []
@@ -93,10 +105,10 @@ def accuracy_train():
     preds = np.concatenate(preds)
     sm = sum(t == p for t, p in zip(trues, preds))
     return sm/len(y_train)
-    
+
     
 def accuracy_test():
-    indexes29 = [i for i, c in enumerate(y_test) if c >= 2]
+    indexes29 = [i for i, c in enumerate(y_test) if c >= out_dim]
     
     X_test_01 = np.delete(X_test, indexes29, axis=0)
     X_test_01 = X_test_01.reshape(len(X_test_01), in_dim, 1)
@@ -118,6 +130,7 @@ for epoch in range(20):
     for i in range(0, len(X_train)-mod, batch_size):
         sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
                                    y_batch: y_train[i:i+batch_size]})
+    saver.save(sess, 'checkpoint-epoch-'+str(epoch+1)+'.ckpt')
     print('\t* accuracy train:', accuracy_train())
     print('\t* accuracy test:', accuracy_test())
 
