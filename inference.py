@@ -131,11 +131,15 @@ def accuracy_test():
     return sm/len(y_test_01)
 
 #saver = tf.train.Saver()
-for epoch in range(1):
+for epoch in range(5):
     print('Epoch:', epoch+1)
     for i in range(0, len(X_train)-mod, batch_size):
         sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
                                    y_batch: y_train[i:i+batch_size]})
+        l, tl, KL = sess.run([loss, total_cost, KL], feed_dict={X_batch: X_train[i:i+batch_size], 
+                                                    y_batch: y_train[i:i+batch_size]}) 
+                                                    
+        print('loss:', l, 'KL:', KL, 'total:', tl)
     #saver.save(sess, 'checkpoint.ckpt') #-epoch-'+str(epoch+1)+'.ckpt')
     #print('\t* accuracy train:', accuracy_train())
     print('\t* accuracy test:', accuracy_test())
