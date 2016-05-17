@@ -28,3 +28,24 @@ Uncertainty
 
 ## CIFAR10
 
+#### Standard deviation
+|  Model       | Balanced accuracy | F1-score |
+|--------------|--------------|--------------|
+| Bayesian NN B|  |  |
+| Bayesian NN  |  |  |
+| MLP dropout  | 0.560 | 0.667 |
+
+#### Entropy
+|  Model       | Balanced accuracy | F1-score |
+|--------------|--------------|--------------|
+| Bayesian NN B|  |  |
+| Bayesian NN  |  |  |
+| MLP dropout  | 0.611 | 0.667 |
+
+#### Variation ratio
+|  Model       | Balanced accuracy | F1-score |
+|--------------|--------------|--------------|
+| Bayesian NN B|  |  |
+| Bayesian NN  |  |  |
+| MLP dropout  | 0.534 | 0.667 |
+

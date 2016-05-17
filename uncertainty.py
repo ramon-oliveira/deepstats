@@ -6,7 +6,7 @@ import datasets
 from keras.models import Sequential
 from keras.layers import Activation, Dense
 from keras import objectives
-from keras.optimizers import SGD
+from keras.optimizers import SGD, Adam, Adagrad
 from keras.callbacks import ModelCheckpoint
 
 
@@ -55,12 +55,12 @@ class Dropout(Layer):
 
 
 
-batch_size = 64
+batch_size = 1
 hidden = 512
 dataset = 'cifar10'
 # bayesian-batch, bayesian, mlp
-network = 'mlp'
-train = False
+network = 'bayesian'
+train = True
 train_labels = [1, 5] # automobile, dog
 (X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, train_labels)
 
@@ -93,8 +93,11 @@ elif network == 'mlp':
     model.add(Activation('softmax'))
     loss = 'categorical_crossentropy'
 
-optimizer = SGD(lr=0.1, momentum=0.9, decay=1e-3, nesterov=True)
-model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
+#optimizer = SGD(lr=0.1, momentum=0.9, decay=1e-3, nesterov=True)
+#optimizer = Adam()
+#optimizer = Adagrad()
+optimizer = SGD()
+model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
 
 if train:
     mc = ModelCheckpoint('weights/'+dataset+'/'+network+'-best-weights.h5', monitor='val_acc',
@@ -201,5 +204,34 @@ Entropy                 score   threshold       TP      TN
 Variation ratio         score   threshold       TP      TN
     balanced acc        0.671   0.014           0.999   0.344
     f1 score            0.752   0.014           0.999   0.344
+
+
+
+
+-------------------- CIFAR10 ----------------------
+
+########## mlp dropout ##########
+Standard deviation  score   threshold   TP  TN
+    balanced acc    0.560   0.040       0.223   0.898
+    f1 score    0.667   0.361       1.000   0.001
+Entropy score   threshold   TP  TN
+    balanced acc    0.611   0.295       0.507   0.714
+    f1 score    0.667   3.037       1.000   0.000
+Variation ratio score   threshold   TP  TN
+    balanced acc    0.534   0.094       0.801   0.266
+    f1 score    0.667   3.037       1.000   0.000
+
+
+########## bayesian-batch ##########
+Standard deviation  score   threshold   TP  TN
+    balanced acc    0.503   0.477       0.053   0.953
+    f1 score    0.667   3.037       1.000   0.000
+Entropy score   threshold   TP  TN
+    balanced acc    0.507   0.663       0.096   0.917
+    f1 score    0.667   3.037       1.000   0.000
+Variation ratio score   threshold   TP  TN
+    balanced acc    0.509   0.465       0.703   0.315
+    f1 score    0.667   3.037       1.000   0.000
+
 
 """
