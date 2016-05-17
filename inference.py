@@ -1,174 +1,129 @@
-from keras.datasets import mnist
-from keras.utils import np_utils
-import tensorflow as tf
+from keras import backend as K
+from keras.engine.topology import Layer
+import scipy.stats
 import numpy as np
-import random
-np.random.seed(42)
-random.seed(42)
+import datasets
+from keras.models import Sequential
+from keras.layers import Activation, Dense
+from keras import objectives
+from keras.optimizers import SGD
+from keras.callbacks import ModelCheckpoint
 
-in_dim = 784
-out_dim = 2
+
+class Bayesian(Layer):
+
+    def __init__(self, output_dim, **kwargs):
+        self.output_dim = output_dim
+        super(Bayesian, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        input_dim = input_shape[1]
+        shape = [input_dim, self.output_dim]
+        self.W = K.random_normal(shape)
+        v = np.sqrt(6.0 / (input_dim + self.output_dim))
+        self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
+        self.stdev = K.variable(np.random.uniform(low=-v, high=v, size=shape))
+        self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]))
+
+        self.trainable_weights = [self.mean, self.stdev, self.bias]
+
+    def call(self, x, mask=None):
+        return K.dot(x, self.W*K.exp(self.stdev) + self.mean) + self.bias
+
+    def get_output_shape_for(self, input_shape):
+        return (input_shape[0], self.output_dim)
+
+
+class Dropout(Layer):
+
+    def __init__(self, p, **kwargs):
+        self.p = p
+        if 0. < self.p < 1.:
+            self.uses_learning_phase = True
+        self.supports_masking = True
+        super(Dropout, self).__init__(**kwargs)
+
+    def call(self, x, mask=None):
+        if 0. < self.p < 1.:
+            x = K.dropout(x, level=self.p)
+        return x
+
+    def get_config(self):
+        config = {'p': self.p}
+        base_config = super(Dropout, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+
+batch_size = 1
 hidden = 512
-batch_size = 8
+dataset = 'mnist'
+network = 'mlp'
+train = False
+train_labels = [0, 1]
+(X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, train_labels)
 
-(X_train, y_train), (X_test, y_test) = mnist.load_data()
-X_train = X_train.reshape(60000, 784)
-X_test = X_test.reshape(10000, 784)
-X_train = X_train.astype('float32')
-X_test = X_test.astype('float32')
-X_train /= 255
-X_test /= 255
+in_dim = X_train.shape[1]
+out_dim = y_train.shape[1]
+nb_batchs = X_train.shape[0]//batch_size
 
-indexes29 = [i for i, c in enumerate(y_train) if c >= out_dim]
-indexes01 = [i for i, c in enumerate(y_train) if c < out_dim]
-X_train = np.delete(X_train, indexes29, axis=0)
-X_train = X_train.reshape(len(X_train), in_dim, 1)
-X_test = X_test.reshape(len(X_test), in_dim, 1)
-y_train = np.delete(y_train, indexes29, axis=0)
-y_train = np_utils.to_categorical(y_train, out_dim)
+def bayesian_loss(y_true, y_pred):
+    ce = objectives.categorical_crossentropy(y_true, y_pred)
+    kl = K.variable(0.0)
+    for layer in model.layers:
+        if type(layer) is Bayesian:
+            mean = layer.mean
+            stdev = layer.stdev
+            kl = kl + K.sum((mean**2)/2.0 + (K.exp(2*stdev) - 1.0 - 2*stdev)/2.0)
+    return ce + kl/nb_batchs
 
-nb_batchs = len(X_train)//batch_size
-mod = len(X_train) % batch_size
+model = Sequential()
+if network == 'bayesian':
+    model.add(Bayesian(hidden, input_shape=[in_dim]))
+    model.add(Activation('relu'))
+    model.add(Bayesian(out_dim))
+    model.add(Activation('softmax'))
+    loss = bayesian_loss
+elif network == 'mlp':
+    model.add(Dense(hidden, input_shape=[in_dim]))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(out_dim))
+    model.add(Activation('softmax'))
+    loss = 'categorical_crossentropy'
 
-X_batch = tf.placeholder(tf.float32, [batch_size, in_dim, 1], name='X_batch')
-y_batch = tf.placeholder(tf.float32, [batch_size, out_dim, 1], name='y_batch')
-
-v = -np.sqrt(6.0 / (in_dim + out_dim))
-## LAYER 1
-shape = [batch_size, hidden, in_dim]
-initial_m0 = tf.random_uniform(shape, -v, v, dtype=tf.float32)
-mean0 = tf.Variable(initial_m0, name='mean0')
-initial_s0 = tf.random_uniform(shape, -v, v, dtype=tf.float32)
-stddev0 = tf.Variable(initial_s0, name='stddev0')
-W0 = tf.random_normal(shape, dtype=tf.float32, name='W0')
-
-initial_b0 = tf.random_uniform([hidden, 1], -0.1, 0.1)
-b0 = tf.Variable(initial_b0, dtype=tf.float32, name='b0')
-
-
-## LAYER 2 (OUTPUT)
-shape = [batch_size, out_dim, hidden]
-initial_m1 = tf.random_uniform(shape, -v, v, dtype=tf.float32)
-mean1 = tf.Variable(initial_m1, name='mean1')
-initial_s1 = tf.random_uniform(shape, -v, v, dtype=tf.float32)
-stddev1 = tf.Variable(initial_s1, name='stddev1')
-W1 = tf.random_normal(shape, dtype=tf.float32, name='W1')
-
-initial_b1 = tf.random_uniform([out_dim, 1], -0.1, 0.1)
-b1 = tf.Variable(initial_b1, dtype=tf.float32, name='b1')
-
-
-# * is elementwise operator
-ff0 = tf.nn.relu(tf.batch_matmul(W0*tf.exp(stddev0) + mean0, X_batch) + b0)
-ff1 = tf.batch_matmul(W1*tf.exp(stddev1) + mean1, ff0) + b1
-y_out = ff1
-#y_out = tf.nn.relu(ff1)
-#y_out = tf.nn.sigmoid(ff1)
-y_out = tf.reshape(y_out, [batch_size, out_dim])
-y_out_soft = tf.nn.softmax(y_out)
-y_batch = tf.reshape(y_batch, [batch_size, out_dim])
-cost = tf.nn.softmax_cross_entropy_with_logits(y_out,y_batch)
-
-total_cost = tf.reduce_mean(cost)
-
-KL0 = (mean0**2)/2.0 + (tf.exp(2*stddev0) - 1.0 - 2*stddev0)/2.0
-KL1 = (mean1**2)/2.0 + (tf.exp(2*stddev1) - 1.0 - 2*stddev1)/2.0
-KL = (tf.reduce_sum(KL0) + tf.reduce_sum(KL1))/nb_batchs
-
-loss = total_cost + KL
-
-vl = [mean0, stddev0, b0, mean1, stddev1, b1]
-train = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
-
-
-init = tf.initialize_all_variables()
-sess = tf.Session()
-sess.run(init)
-
-
-def stats_class(c):
-    ids_c = [i for i, t in enumerate(y_test) if t == c]
-    X = X_test[ids_c]
-    preds_std = []
-    for x in X:
-        xin = np.array([x]*batch_size)
-        outs = sess.run(y_out_soft,feed_dict={X_batch: xin})
-        #pred_mean = outs.mean(axis=0)
-        pred_std = outs.std(axis=0)
-        preds_std.append(pred_std[0])
-    preds_std = np.array(preds_std)
-    print('Class', c)
-    print(' '*4, 'mean std:', preds_std.mean())        
-
-
-def accuracy_train():
-    trues = np.argmax(y_train, 1)
-    preds = []
-    for i in range(0, len(X_train)-mod, batch_size):
-        preds.append(sess.run(tf.arg_max(y_out_soft, 1), 
-                              feed_dict={X_batch: X_train[i:i+batch_size]}))
-    preds = np.concatenate(preds)
-    sm = sum(t == p for t, p in zip(trues, preds))
-    return sm/len(y_train)
-
+optimizer = SGD(lr=0.1, momentum=0.9, decay=1e-3, nesterov=True)
+model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     
-def accuracy_test():
-    indexes29 = [i for i, c in enumerate(y_test) if c >= out_dim]
-    
-    X_test_01 = np.delete(X_test, indexes29, axis=0)
-    X_test_01 = X_test_01.reshape(len(X_test_01), in_dim, 1)
-    y_test_01 = np.delete(y_test, indexes29, axis=0)
-    y_test_01 = np_utils.to_categorical(y_test_01, out_dim)    
-    
-    trues = np.argmax(y_test_01, 1)
-    preds = []
-    mod = len(X_test_01) % batch_size
-    for i in range(0, len(X_test_01)-mod, batch_size):
-        preds.append(sess.run(tf.arg_max(y_out_soft, 1), 
-                              feed_dict={X_batch: X_test_01[i:i+batch_size]}))
-    preds = np.concatenate(preds)
-    sm = sum(t == p for t, p in zip(trues, preds))
-    return sm/len(y_test_01)
-
-#saver = tf.train.Saver()
-for epoch in range(5):
-    print('Epoch:', epoch+1)
-    for i in range(0, len(X_train)-mod, batch_size):
-        sess.run(train, feed_dict={X_batch: X_train[i:i+batch_size], 
-                                   y_batch: y_train[i:i+batch_size]})
-        l, tl, kl_ = sess.run([loss, total_cost, KL], feed_dict={X_batch: X_train[i:i+batch_size], 
-                                                    y_batch: y_train[i:i+batch_size]}) 
-                                                    
-        print('loss:', l, 'KL:', kl_, 'total:', tl)
-    #saver.save(sess, 'checkpoint.ckpt') #-epoch-'+str(epoch+1)+'.ckpt')
-    #print('\t* accuracy train:', accuracy_train())
-    print('\t* accuracy test:', accuracy_test())
+if train:
+    mc = ModelCheckpoint(network+"-best-weights.h5", monitor='val_acc', 
+                         save_best_only=True)
+    model.fit(X_train, y_train, nb_epoch=20, batch_size=batch_size, 
+              validation_split=0.2, callbacks=[mc])
+else:
+    model.load_weights(network+'-best-weights.h5')
 
 
-# Uncertainty prediction
 test_pred_mean = {x:[] for x in range(10)}
 test_pred_std = {x:[] for x in range(10)}
-test_entropy_bayesian_v1 = {x:[] for x in range(10)}
-test_entropy_bayesian_v2 = {x:[] for x in range(10)}
-test_entropy_deterministic = {x:[] for x in range(10)}
+test_entropy_bayesian = {x:[] for x in range(10)}
 test_variation_ratio = {x:[] for x in range(10)}
 
-for i, x in enumerate(X_test):
-    xin = np.array([x]*batch_size)
-    outs = sess.run(y_out_soft,feed_dict={X_batch: xin})
-    pred_mean = outs.mean(axis=0)[1]
-    pred_std = outs.std(axis=0)[1]
-    
-    test_pred_mean[y_test[i]].append(pred_mean)
-    test_pred_std[y_test[i]].append(pred_std)
+for i, x in enumerate(X_test[:100]):
+    probs = model.predict(np.array([x]*50), batch_size=1)
+    pred_mean = probs.mean(axis=0)
+    pred_std = probs.std(axis=0)
+    entropy = scipy.stats.entropy(pred_mean)
+    _, count = scipy.stats.mode(np.argmax(probs, axis=1))
+    variation_ration = 1.0 - count[0]/len(probs)
 
-print(test_pred_std[0][:10]) 
-print(test_pred_std[1][:10]) 
-print(test_pred_std[2][:10]) 
-print(test_pred_std[3][:10]) 
+    test_pred_mean[y_test[i]].append(pred_mean[1])
+    test_pred_std[y_test[i]].append(pred_std.mean())
+    test_entropy_bayesian[y_test[i]].append(entropy)
+    test_variation_ratio[y_test[i]].append(variation_ration)
+
 # Anomaly detection
 # by classical prediction entropy
-inside_labels = [0, 1]
 def anomaly_detection(anomaly_score_dict, name):
     threshold = np.logspace(-10.0, 1.0, 1000)
     acc = {}
@@ -176,23 +131,56 @@ def anomaly_detection(anomaly_score_dict, name):
         tp = 0.0
         tn = 0.0
         for l in anomaly_score_dict:
-            if l in inside_labels:
+            if l in train_labels:
                 tp += (np.array(anomaly_score_dict[l]) < t).mean()
             else:
                 tn += (np.array(anomaly_score_dict[l]) >= t).mean()
-        tp /= len(inside_labels)
-        tn /= 10.0 - len(inside_labels)
+        tp /= len(train_labels)
+        tn /= 10.0 - len(train_labels)
         bal_acc = (tp + tn)/2.0
         f1_score = 2.0*tp/(2.0 + tp - tn)
         acc[t] = [bal_acc, f1_score, tp, tn]
-        
+
     print("{}\tscore\tthreshold\tTP\tTN".format(name))
     sorted_acc = sorted(acc.items(), key= lambda x : x[1][0], reverse = True)
     print("\tbalanced acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
     sorted_acc = sorted(acc.items(), key= lambda x : x[1][1], reverse = True)
     print("\tf1 score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
 
+print('\n\n', '#'*10, network, '#'*10)
 anomaly_detection(test_pred_std, "Standard deviation")
+anomaly_detection(test_entropy_bayesian, "Entropy")
+anomaly_detection(test_variation_ratio, "Variation ratio")
 
-sess = tf.InteractiveSession()
-sess.close()
+"""
+
+########## batch bayesian ##########
+
+Standard deviation      score   threshold       TP      TN
+        balanced acc    0.927   0.207           0.964   0.889
+        f1 score        0.929   0.207           0.964   0.889
+
+Entropy                 score   threshold       TP      TN
+        balanced acc    0.927   0.187           0.964   0.889
+        f1 score        0.929   0.187           0.964   0.889
+
+Variation ratio         score   threshold       TP      TN
+        balanced acc    0.927   0.043           0.964   0.889
+        f1 score        0.929   0.043           0.964   0.889
+
+
+########## mlp dropout ##########
+
+Standard deviation  score   threshold   TP      TN
+    balanced acc    0.991   0.000       1.000   0.982
+    f1 score        0.991   0.000       1.000   0.982
+
+Entropy             score   threshold   TP      TN
+    balanced acc    0.991   0.000       1.000   0.982
+    f1 score        0.991   0.000       1.000   0.982
+
+Variation ratio     score   threshold   TP      TN
+    balanced acc    0.638   0.014       1.000   0.276
+    f1 score        0.734   0.014       1.000   0.276
+
+"""
