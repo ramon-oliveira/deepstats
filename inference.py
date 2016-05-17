@@ -194,10 +194,10 @@ Standard deviation      score   threshold       TP      TN
 
 Entropy                 score   threshold       TP      TN
     balanced acc        0.922   0.002           0.945   0.900
-    f1 score            0.924   0.002               0.945   0.900
+    f1 score            0.924   0.002           0.945   0.900
 
-Variation ratio         score   threshold           TP      TN
-    balanced acc        0.671   0.014               0.999   0.344
-    f1 score            0.752   0.014               0.999   0.344
+Variation ratio         score   threshold       TP      TN
+    balanced acc        0.671   0.014           0.999   0.344
+    f1 score            0.752   0.014           0.999   0.344
 
 """
