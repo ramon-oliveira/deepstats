@@ -58,6 +58,7 @@ class Dropout(Layer):
 batch_size = 64
 hidden = 512
 dataset = 'cifar10'
+# bayesian-batch, bayesian, mlp
 network = 'mlp'
 train = False
 train_labels = [1, 5] # automobile, dog
