@@ -13,11 +13,13 @@ def load_data(dataset, train_labels):
     X_train = X_train[idxs_train]/255
     X_train = X_train.reshape(X_train.shape[0], np.prod(X_train.shape[1:]))
     y_train = y_train[idxs_train]
+    y_train = y_train.reshape(y_train.shape[0])
     train_labels.sort()
-    label_key = {i: l for i, l in enumerate(train_labels)}
+    label_key = {l: i for i, l in enumerate(train_labels)}
     y_train = np.array([label_key[l] for l in y_train])
     y_train = np_utils.to_categorical(y_train)
 
     X_test = X_test.reshape(X_test.shape[0], np.prod(X_test.shape[1:]))/255
+    y_test = y_test.reshape(y_test.shape[0])
 
     return (X_train, y_train) , (X_test, y_test)

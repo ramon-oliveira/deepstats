@@ -55,12 +55,12 @@ class Dropout(Layer):
 
 
 
-batch_size = 1
+batch_size = 64
 hidden = 512
-dataset = 'mnist'
+dataset = 'cifar10'
 network = 'mlp'
 train = False
-train_labels = [0, 1]
+train_labels = [1, 5] # automobile, dog
 (X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, train_labels)
 
 in_dim = X_train.shape[1]
@@ -78,7 +78,7 @@ def bayesian_loss(y_true, y_pred):
     return ce + kl/nb_batchs
 
 model = Sequential()
-if network == 'bayesian':
+if 'bayesian' in network:
     model.add(Bayesian(hidden, input_shape=[in_dim]))
     model.add(Activation('relu'))
     model.add(Bayesian(out_dim))
@@ -93,15 +93,16 @@ elif network == 'mlp':
     loss = 'categorical_crossentropy'
 
 optimizer = SGD(lr=0.1, momentum=0.9, decay=1e-3, nesterov=True)
-model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
+model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
 
 if train:
-    mc = ModelCheckpoint(network+"-best-weights.h5", monitor='val_acc',
+    mc = ModelCheckpoint('weights/'+dataset+'/'+network+'-best-weights.h5', monitor='val_acc',
                          save_best_only=True)
-    model.fit(X_train, y_train, nb_epoch=20, batch_size=batch_size,
+    model.fit(X_train, y_train, nb_epoch=50, batch_size=batch_size,
               validation_split=0.2, callbacks=[mc])
-else:
-    model.load_weights(network+'-best-weights.h5')
+
+
+model.load_weights('weights/'+dataset+'/'+network+'-best-weights.h5')
 
 
 test_pred_mean = {x:[] for x in range(10)}
