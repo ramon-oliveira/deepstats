@@ -94,11 +94,11 @@ elif network == 'mlp':
 
 optimizer = SGD(lr=0.1, momentum=0.9, decay=1e-3, nesterov=True)
 model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
-    
+
 if train:
-    mc = ModelCheckpoint(network+"-best-weights.h5", monitor='val_acc', 
+    mc = ModelCheckpoint(network+"-best-weights.h5", monitor='val_acc',
                          save_best_only=True)
-    model.fit(X_train, y_train, nb_epoch=20, batch_size=batch_size, 
+    model.fit(X_train, y_train, nb_epoch=20, batch_size=batch_size,
               validation_split=0.2, callbacks=[mc])
 else:
     model.load_weights(network+'-best-weights.h5')
@@ -109,7 +109,7 @@ test_pred_std = {x:[] for x in range(10)}
 test_entropy_bayesian = {x:[] for x in range(10)}
 test_variation_ratio = {x:[] for x in range(10)}
 
-for i, x in enumerate(X_test[:100]):
+for i, x in enumerate(X_test):
     probs = model.predict(np.array([x]*50), batch_size=1)
     pred_mean = probs.mean(axis=0)
     pred_std = probs.std(axis=0)
@@ -154,6 +154,8 @@ anomaly_detection(test_variation_ratio, "Variation ratio")
 
 """
 
+--------------------------- MNIST ----------------------------
+
 ########## batch bayesian ##########
 
 Standard deviation      score   threshold       TP      TN
@@ -169,18 +171,33 @@ Variation ratio         score   threshold       TP      TN
         f1 score        0.929   0.043           0.964   0.889
 
 
+########## bayesian ##########
+
+Standard deviation      score   threshold       TP      TN
+    balanced acc        0.937   0.007           0.943   0.930
+    f1 score            0.937   0.007           0.943   0.930
+
+Entropy                 score   threshold       TP      TN
+    balanced acc        0.937   0.000           0.934   0.940
+    f1 score            0.937   0.008           0.943   0.930
+
+Variation ratio         score   threshold       TP      TN
+    balanced acc        0.936   0.014           0.944   0.928
+    f1 score            0.936   0.014           0.944   0.928
+
+
 ########## mlp dropout ##########
 
-Standard deviation  score   threshold   TP      TN
-    balanced acc    0.991   0.000       1.000   0.982
-    f1 score        0.991   0.000       1.000   0.982
+Standard deviation      score   threshold       TP      TN
+    balanced acc        0.921   0.000           0.932   0.910
+    f1 score            0.923   0.000           0.945   0.897
 
-Entropy             score   threshold   TP      TN
-    balanced acc    0.991   0.000       1.000   0.982
-    f1 score        0.991   0.000       1.000   0.982
+Entropy                 score   threshold       TP      TN
+    balanced acc        0.922   0.002           0.945   0.900
+    f1 score            0.924   0.002               0.945   0.900
 
-Variation ratio     score   threshold   TP      TN
-    balanced acc    0.638   0.014       1.000   0.276
-    f1 score        0.734   0.014       1.000   0.276
+Variation ratio         score   threshold           TP      TN
+    balanced acc        0.671   0.014               0.999   0.344
+    f1 score            0.752   0.014               0.999   0.344
 
 """
