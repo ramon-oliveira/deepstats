@@ -43,7 +43,7 @@ Uncertainty
 |--------------|--------------|--------------|
 | Bayesian NN B|  |  |
 | Bayesian NN  |  |  |
-| MLP dropout  | 0.661 | 0.670 |
+| MLP dropout  | **0.661** | **0.670** |
 | MLP deterministic  | 0.651 | 0.668 |
 
 #### Variation ratio
