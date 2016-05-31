@@ -9,7 +9,8 @@ from keras import objectives
 from keras.optimizers import SGD, Adam, Adagrad, Adadelta, RMSprop
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import TensorBoard
-
+from sklearn import datasets
+import matplotlib.pyplot as plt
 
 class Bayesian(Layer):
 
@@ -21,7 +22,7 @@ class Bayesian(Layer):
         input_dim = input_shape[1]
         shape = [input_dim, self.output_dim]
         self.W = K.random_normal(shape)
-        v = np.sqrt(6.0 / (input_dim + self.output_dim))
+        v = 1.0 # np.sqrt(6.0 / (input_dim + self.output_dim))
         self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
         self.log_stdev = K.variable(np.random.uniform(low=-v, high=v, size=shape))
         self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]))
@@ -56,17 +57,39 @@ class MyDropout(Layer):
 
 
 
-batch_size = 64
-hidden = 2048
-dataset = 'cifar10'
+batch_size = 32
+hidden = 512
+dataset = 'diabetes' #mnist
 # bayesian-batch, bayesian, mlp, mlp-deterministic
-network = 'bayesian-batch' #'bayesian'
+network = 'mlp' #'bayesian'
 train = True
 train_labels = [0, 1] # automobile, dog
-(X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, train_labels)
+#(X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, train_labels)
 
-in_dim = X_train.shape[1]
-out_dim = y_train.shape[1]
+diabetes = datasets.load_diabetes()
+diabetes_X = diabetes.data[:, np.newaxis, 2]
+X_train = diabetes_X[:-20]
+X_test = diabetes_X[-20:]
+y_train = diabetes.target[:-20]
+y_test = diabetes.target[-20:]
+
+
+# Standardize
+xmu = diabetes.data[:, np.newaxis, 2].mean()
+xsigma = diabetes.data[:, np.newaxis, 2].std()
+
+ymu = diabetes.target.mean()
+ysigma = diabetes.target.std()
+
+X_train = (X_train - xmu)/xsigma
+y_train = (y_train - ymu)/ysigma
+
+
+X_test = (X_test - xmu)/xsigma
+y_test = (y_test - ymu)/ysigma
+
+in_dim = X_train.shape[-1]
+out_dim = y_train.shape[-1]
 nb_batchs = X_train.shape[0]//batch_size
 
 def bayesian_loss(y_true, y_pred):
@@ -81,7 +104,7 @@ def bayesian_loss(y_true, y_pred):
 
             kl = kl + K.sum(1.0 + 2.0*log_stdev - mean**2.0 - K.exp(2.0*log_stdev))/2.0
             #(mean**2)/2 + (K.exp(2*stdev) - 1 - 2*stdev)/2)
-    return ce# - kl
+    return ce - kl/nb_batchs
 
 
 model = Sequential()
@@ -89,16 +112,16 @@ if 'bayesian' in network:
     model.add(Bayesian(hidden, input_shape=[in_dim]))
     model.add(Activation('relu'))
     model.add(Bayesian(out_dim))
-    model.add(Activation('softmax'))
+    model.add(Activation('linear'))
     loss = bayesian_loss
-    loss = 'categorical_crossentropy' #bayesian_loss
+    # loss = 'categorical_crossentropy' #bayesian_loss
 elif network == 'mlp':
     model.add(Dense(hidden, input_shape=[in_dim]))
     model.add(Activation('relu'))
     model.add(MyDropout(0.5))
     model.add(Dense(out_dim))
-    model.add(Activation('softmax'))
-    loss = 'categorical_crossentropy'
+    model.add(Activation('linear'))
+    loss = 'mse'
 elif network == 'mlp-deterministic':
     model.add(Dense(hidden, input_shape=[in_dim]))
     model.add(Activation('relu'))
@@ -109,11 +132,11 @@ elif network == 'mlp-deterministic':
 
 #optimizer = SGD(lr=0.01, momentum=0.9, decay=1e-4, nesterov=True)
 #optimizer = Adam()
-optimizer = Adagrad()
+#optimizer = Adagrad()
 #optimizer = SGD()
-#optimizer = Adadelta()#clipnorm=1.0, clipvalue=1.0)
+optimizer = Adadelta()#clipnorm=1.0, clipvalue=1.0)
 #optimizer = RMSprop()
-model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
+model.compile(loss=loss, optimizer=optimizer, metrics=['acc'])
 
 weights_file = 'weights/'+dataset+'/'+network+'-best-weights.h5'
 
@@ -121,60 +144,63 @@ weights_file = 'weights/'+dataset+'/'+network+'-best-weights.h5'
 
 if train:
     mc = ModelCheckpoint(weights_file, monitor='val_loss', save_best_only=True)
-    tb = TensorBoard(log_dir='./logs', histogram_freq=1)
-    model.fit(X_train, y_train, nb_epoch=50, batch_size=batch_size,
-              validation_split=0.2, callbacks=[mc, tb])
+    model.fit(X_train, y_train, nb_epoch=20, batch_size=batch_size,
+              validation_split=0.2, callbacks=[mc])
 
-model.load_weights(weights_file)
+#model.load_weights(weights_file)
 
 
-test_pred_mean = {x:[] for x in range(10)}
-test_pred_std = {x:[] for x in range(10)}
-test_entropy_bayesian = {x:[] for x in range(10)}
-test_variation_ratio = {x:[] for x in range(10)}
+test_pred_mean = []
+test_pred_std = []
+test_entropy_bayesian = []
+test_variation_ratio = []
 
 for i, x in enumerate(X_test):
     probs = model.predict(np.array([x]*50), batch_size=1)
     pred_mean = probs.mean(axis=0)
     pred_std = probs.std(axis=0)
-    entropy = scipy.stats.entropy(pred_mean)
+    entropy = scipy.stats.entropy(probs)
     _, count = scipy.stats.mode(np.argmax(probs, axis=1))
     variation_ration = 1.0 - count[0]/len(probs)
+    test_pred_mean.append(pred_mean[0])
+    test_pred_std.append(pred_std.mean())
+    test_entropy_bayesian.append(entropy)
+    test_variation_ratio.append(variation_ration)
 
-    test_pred_mean[y_test[i]].append(pred_mean[1])
-    test_pred_std[y_test[i]].append(pred_std.mean())
-    test_entropy_bayesian[y_test[i]].append(entropy)
-    test_variation_ratio[y_test[i]].append(variation_ration)
+plt.plot(y_test, 'o')
+plt.errorbar(list(range(len(X_test))), test_pred_mean, yerr=test_pred_std)
+#plt.errorbar(list(range(len(X_test))), test_pred_mean, yerr=test_entropy_bayesian)    
 
-# Anomaly detection
-# by classical prediction entropy
-def anomaly_detection(anomaly_score_dict, name):
-    threshold = np.logspace(-10.0, 1.0, 1000)
-    acc = {}
-    for t in threshold:
-        tp = 0.0
-        tn = 0.0
-        for l in anomaly_score_dict:
-            if l in train_labels:
-                tp += (np.array(anomaly_score_dict[l]) < t).mean()
-            else:
-                tn += (np.array(anomaly_score_dict[l]) >= t).mean()
-        tp /= len(train_labels)
-        tn /= 10.0 - len(train_labels)
-        bal_acc = (tp + tn)/2.0
-        f1_score = 2.0*tp/(2.0 + tp - tn)
-        acc[t] = [bal_acc, f1_score, tp, tn]
-
-    print("{}\tscore\tthreshold\tTP\tTN".format(name))
-    sorted_acc = sorted(acc.items(), key= lambda x : x[1][0], reverse = True)
-    print("\tbalanced acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
-    sorted_acc = sorted(acc.items(), key= lambda x : x[1][1], reverse = True)
-    print("\tf1 score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
-
-print('\n\n', '#'*10, network, '#'*10)
-anomaly_detection(test_pred_std, "Standard deviation")
-anomaly_detection(test_entropy_bayesian, "Entropy")
-anomaly_detection(test_variation_ratio, "Variation ratio")
+#
+## Anomaly detection
+## by classical prediction entropy
+#def anomaly_detection(anomaly_score_dict, name):
+#    threshold = np.logspace(-10.0, 1.0, 1000)
+#    acc = {}
+#    for t in threshold:
+#        tp = 0.0
+#        tn = 0.0
+#        for l in anomaly_score_dict:
+#            if l in train_labels:
+#                tp += (np.array(anomaly_score_dict[l]) < t).mean()
+#            else:
+#                tn += (np.array(anomaly_score_dict[l]) >= t).mean()
+#        tp /= len(train_labels)
+#        tn /= 10.0 - len(train_labels)
+#        bal_acc = (tp + tn)/2.0
+#        f1_score = 2.0*tp/(2.0 + tp - tn)
+#        acc[t] = [bal_acc, f1_score, tp, tn]
+#
+#    print("{}\tscore\tthreshold\tTP\tTN".format(name))
+#    sorted_acc = sorted(acc.items(), key= lambda x : x[1][0], reverse = True)
+#    print("\tbalanced acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
+#    sorted_acc = sorted(acc.items(), key= lambda x : x[1][1], reverse = True)
+#    print("\tf1 score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
+#
+#print('\n\n', '#'*10, network, '#'*10)
+#anomaly_detection(test_pred_std, "Standard deviation")
+#anomaly_detection(test_entropy_bayesian, "Entropy")
+#anomaly_detection(test_variation_ratio, "Variation ratio")
 
 """
 
