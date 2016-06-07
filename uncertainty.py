@@ -15,8 +15,9 @@ class Bayesian(Layer):
         super(Bayesian, self).__init__(**kwargs)
 
     def build(self, input_shape):
+        print(input_shape)
         input_dim = input_shape[1]
-        shape = [input_dim, self.output_dim]
+        shape = [input_shape[0], input_dim, self.output_dim]
         self.W = K.random_normal(shape, mean=0.0, std=std_prior)
         v = np.sqrt(6.0 / (input_dim + self.output_dim))
         self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
@@ -31,7 +32,7 @@ class Bayesian(Layer):
 
         # http://jmlr.org/proceedings/papers/v37/blundell15.pdf
         self.W_sample = self.mean + self.W*K.log(1.0 + K.exp(self.log_std))
-        return K.dot(x, self.W_sample) + self.bias
+        return K.batch_dot(x, self.W_sample) + self.bias
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.output_dim)
@@ -58,7 +59,7 @@ class MyDropout(Layer):
 
 
 
-batch_size = 100
+batch_size = 5
 hidden = 512
 dataset = 'cifar10'
 # bayesian*, mlp, mlp-deterministic
@@ -71,7 +72,7 @@ in_dim = X_train.shape[1]
 out_dim = y_train.shape[1]
 nb_batchs = X_train.shape[0]//batch_size
 
-std_prior = 0.05#np.exp(-3, dtype=np.float32)
+std_prior = 0.05
 
 def log_gaussian(x, mean, std):
     return -K.log(2*np.pi)/2.0 - K.log(K.abs(std)) - (x-mean)**2/(2*std**2)
@@ -102,7 +103,7 @@ def bayesian_loss(y_true, y_pred):
 
 model = Sequential()
 if 'bayesian' in network:
-    model.add(Bayesian(hidden, input_shape=[in_dim]))
+    model.add(Bayesian(hidden, batch_input_shape=[batch_size, in_dim]))
     model.add(Activation('relu'))
     model.add(Bayesian(out_dim))
     model.add(Activation('softmax'))
@@ -130,10 +131,10 @@ model.compile(loss=loss, optimizer='adadelta', metrics=['accuracy'])
 if train:
     cbs = []
     #cbs.append(ModelCheckpoint(weights_file, monitor='val_loss', save_best_only=True))
-    model.fit(X_train, y_train, nb_epoch=50, batch_size=batch_size, validation_split=0.2, callbacks=cbs)
+    model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size, validation_split=0.2, callbacks=cbs)
 
 #model.load_weights(weights_file)
-
+'''
 test_pred_mean = {x:[] for x in range(10)}
 test_pred_std = {x:[] for x in range(10)}
 test_entropy_bayesian = {x:[] for x in range(10)}
@@ -181,7 +182,7 @@ print('\n\n', '#'*10, network, '#'*10)
 anomaly_detection(test_pred_std, "Standard deviation")
 anomaly_detection(test_entropy_bayesian, "Entropy")
 anomaly_detection(test_variation_ratio, "Variation ratio")
-
+'''
 
 
 """
