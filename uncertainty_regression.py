@@ -8,7 +8,7 @@ from keras.layers import Activation, Dense, ELU, Dropout
 from keras import objectives
 from keras.optimizers import SGD, Adam, Adagrad, Adadelta, RMSprop
 from keras.callbacks import ModelCheckpoint
-from keras.callbacks import TensorBoard
+from keras.regularizers import l2
 from sklearn import datasets
 import matplotlib.pyplot as plt
 
@@ -30,7 +30,8 @@ class Bayesian(Layer):
         self.trainable_weights = [self.mean, self.bias, self.log_stdev]
 
     def call(self, x, mask=None):
-        return K.dot(x, self.W*K.exp(self.log_stdev) + self.mean) + self.bias
+        return K.batch_dot(x, self.W*K.exp(self.log_stdev) + self.mean) + self.bias
+        #return K.dot(x, self.W*self.log_stdev + self.mean) + self.bias
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.output_dim)
@@ -65,13 +66,14 @@ network = 'mlp' #'bayesian'
 train = True
 train_labels = [0, 1] # automobile, dog
 #(X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, train_labels)
+reg = l2(l=0.001)
 
 diabetes = datasets.load_diabetes()
 diabetes_X = diabetes.data[:, np.newaxis, 2]
-X_train = diabetes_X[:-20]
-X_test = diabetes_X[-20:]
-y_train = diabetes.target[:-20]
-y_test = diabetes.target[-20:]
+X_train = diabetes_X[:-50]
+X_test = diabetes_X[-50:]
+y_train = diabetes.target[:-50]
+y_test = diabetes.target[-50:]
 
 
 # Standardize
@@ -88,12 +90,12 @@ y_train = (y_train - ymu)/ysigma
 X_test = (X_test - xmu)/xsigma
 y_test = (y_test - ymu)/ysigma
 
-in_dim = X_train.shape[-1]
-out_dim = y_train.shape[-1]
+in_dim = 1
+out_dim = 1
 nb_batchs = X_train.shape[0]//batch_size
 
 def bayesian_loss(y_true, y_pred):
-    ce = objectives.categorical_crossentropy(y_true, y_pred)
+    ce = objectives.mean_squared_error(y_true, y_pred)
     kl = K.variable(0.0)
     for layer in model.layers:
         if type(layer) is Bayesian:
@@ -103,8 +105,9 @@ def bayesian_loss(y_true, y_pred):
             #DKL_hidden = (1.0 + 2.0*W1_log_var - W1_mu**2.0 - T.exp(2.0*W1_log_var)).sum()/2.0
 
             kl = kl + K.sum(1.0 + 2.0*log_stdev - mean**2.0 - K.exp(2.0*log_stdev))/2.0
+            #kl = kl + K.sum(K.log(1.0/log_stdev) + (log_stdev**2 + mean**2)/2.0 - 0.5)
             #(mean**2)/2 + (K.exp(2*stdev) - 1 - 2*stdev)/2)
-    return ce - kl/nb_batchs
+    return ce + kl/nb_batchs
 
 
 model = Sequential()
@@ -114,29 +117,29 @@ if 'bayesian' in network:
     model.add(Bayesian(out_dim))
     model.add(Activation('linear'))
     loss = bayesian_loss
-    # loss = 'categorical_crossentropy' #bayesian_loss
+    #loss = 'mse' #bayesian_loss
 elif network == 'mlp':
-    model.add(Dense(hidden, input_shape=[in_dim]))
+    model.add(Dense(hidden, input_shape=[in_dim], W_regularizer=reg))
     model.add(Activation('relu'))
     model.add(MyDropout(0.5))
-    model.add(Dense(out_dim))
+    model.add(Dense(out_dim, W_regularizer=reg))
     model.add(Activation('linear'))
     loss = 'mse'
 elif network == 'mlp-deterministic':
-    model.add(Dense(hidden, input_shape=[in_dim]))
+    model.add(Dense(hidden, input_shape=[in_dim], W_regularizer=reg))
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(out_dim))
+    model.add(Dense(out_dim, W_regularizer=reg))
     model.add(Activation('softmax'))
     loss = 'categorical_crossentropy'
 
 #optimizer = SGD(lr=0.01, momentum=0.9, decay=1e-4, nesterov=True)
 #optimizer = Adam()
 #optimizer = Adagrad()
-#optimizer = SGD()
-optimizer = Adadelta()#clipnorm=1.0, clipvalue=1.0)
+optimizer = SGD()
+#optimizer = Adadelta()#clipnorm=1.0, clipvalue=1.0)
 #optimizer = RMSprop()
-model.compile(loss=loss, optimizer=optimizer, metrics=['acc'])
+model.compile(loss=loss, optimizer=optimizer)
 
 weights_file = 'weights/'+dataset+'/'+network+'-best-weights.h5'
 
@@ -144,31 +147,37 @@ weights_file = 'weights/'+dataset+'/'+network+'-best-weights.h5'
 
 if train:
     mc = ModelCheckpoint(weights_file, monitor='val_loss', save_best_only=True)
-    model.fit(X_train, y_train, nb_epoch=20, batch_size=batch_size,
-              validation_split=0.2, callbacks=[mc])
+    model.fit(X_train, y_train, nb_epoch=100, batch_size=batch_size,
+              validation_split=0.1, callbacks=[mc])
 
 #model.load_weights(weights_file)
-
+p=0.5
+l=1.0
+tau = l**2 * (1-p)/(2*X_train.shape[0]*reg.l2)
 
 test_pred_mean = []
-test_pred_std = []
-test_entropy_bayesian = []
-test_variation_ratio = []
+test_pred_var = []
 
 for i, x in enumerate(X_test):
     probs = model.predict(np.array([x]*50), batch_size=1)
-    pred_mean = probs.mean(axis=0)
-    pred_std = probs.std(axis=0)
-    entropy = scipy.stats.entropy(probs)
-    _, count = scipy.stats.mode(np.argmax(probs, axis=1))
-    variation_ration = 1.0 - count[0]/len(probs)
-    test_pred_mean.append(pred_mean[0])
-    test_pred_std.append(pred_std.mean())
-    test_entropy_bayesian.append(entropy)
-    test_variation_ratio.append(variation_ration)
+    pred_mean = probs.mean(axis=0)[0]
+    pred_var = probs.var(axis=0)[0]
+    
+    pred_var += tau**-1
+
+    test_pred_mean.append(pred_mean)
+    test_pred_var.append(pred_var)
+    
+    
 
 plt.plot(y_test, 'o')
-plt.errorbar(list(range(len(X_test))), test_pred_mean, yerr=test_pred_std)
+t = np.arange(len(X_test))
+
+#plt.errorbar(t, test_pred_mean, yerr=test_pred_std)
+
+upper_bound = np.array(test_pred_mean) + np.array(test_pred_var)
+lower_bound = np.array(test_pred_mean) - np.array(test_pred_var)
+plt.fill_between(t, lower_bound, upper_bound, facecolor='green', alpha=0.5)
 #plt.errorbar(list(range(len(X_test))), test_pred_mean, yerr=test_entropy_bayesian)    
 
 #

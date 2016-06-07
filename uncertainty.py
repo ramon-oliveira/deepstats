@@ -4,11 +4,8 @@ import scipy.stats
 import numpy as np
 import datasets
 from keras.models import Sequential
-from keras.layers import Activation, Dense, ELU, Dropout
-from keras import objectives
-from keras.optimizers import SGD, Adam, Adagrad, Adadelta, RMSprop
+from keras.layers import Activation, Dense, Dropout
 from keras.callbacks import ModelCheckpoint
-from keras.callbacks import TensorBoard
 
 
 class Bayesian(Layer):
@@ -20,16 +17,21 @@ class Bayesian(Layer):
     def build(self, input_shape):
         input_dim = input_shape[1]
         shape = [input_dim, self.output_dim]
-        self.W = K.random_normal(shape)
+        self.W = K.random_normal(shape, mean=0.0, std=std_prior)
         v = np.sqrt(6.0 / (input_dim + self.output_dim))
         self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
-        self.log_stdev = K.variable(np.random.uniform(low=-v, high=v, size=shape))
+        self.log_std = K.variable(np.random.uniform(low=-v, high=v, size=shape))
         self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]))
 
-        self.trainable_weights = [self.mean, self.bias, self.log_stdev]
+        self.trainable_weights = [self.mean, self.log_std, self.bias]
 
     def call(self, x, mask=None):
-        return K.dot(x, self.W*K.exp(self.log_stdev) + self.mean) + self.bias
+        #return K.dot(x, self.W*K.exp(self.log_sigma) + self.mu) + self.bias
+        #return K.dot(x, self.W*self.log_sigma + self.mu) + self.bias
+
+        # http://jmlr.org/proceedings/papers/v37/blundell15.pdf
+        self.W_sample = self.mean + self.W*K.log(1.0 + K.exp(self.log_std))
+        return K.dot(x, self.W_sample) + self.bias
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.output_dim)
@@ -56,32 +58,46 @@ class MyDropout(Layer):
 
 
 
-batch_size = 64
-hidden = 2048
+batch_size = 100
+hidden = 512
 dataset = 'cifar10'
-# bayesian-batch, bayesian, mlp, mlp-deterministic
-network = 'bayesian-batch' #'bayesian'
+# bayesian*, mlp, mlp-deterministic
+network = 'bayesian'
 train = True
-train_labels = [0, 1] # automobile, dog
+train_labels = [0, 1]
 (X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, train_labels)
 
 in_dim = X_train.shape[1]
 out_dim = y_train.shape[1]
 nb_batchs = X_train.shape[0]//batch_size
 
+std_prior = 0.05#np.exp(-3, dtype=np.float32)
+
+def log_gaussian(x, mean, std):
+    return -K.log(2*np.pi)/2.0 - K.log(K.abs(std)) - (x-mean)**2/(2*std**2)
+
+def log_gaussian2(x, mean, log_std):
+    log_var = 2*log_std
+    return -K.log(2*np.pi)/2.0 - log_var/2.0 - (x-mean)**2/(2*K.exp(log_var))
+
+
 def bayesian_loss(y_true, y_pred):
-    ce = objectives.categorical_crossentropy(y_true, y_pred)
-    kl = K.variable(0.0)
+    #log_likelihood = objectives.categorical_crossentropy(y_true, y_pred)
+    log_p = K.variable(0.0)
+    log_q = K.variable(0.0)
     for layer in model.layers:
         if type(layer) is Bayesian:
             mean = layer.mean
-            log_stdev = layer.log_stdev
+            log_std = layer.log_std
+            W_sample = layer.W_sample
+            # prior
+            log_p += K.sum(log_gaussian(W_sample, 0.0, std_prior))
+            # posterior
+            log_q += K.sum(log_gaussian2(W_sample, mean, log_std))
 
-            #DKL_hidden = (1.0 + 2.0*W1_log_var - W1_mu**2.0 - T.exp(2.0*W1_log_var)).sum()/2.0
+    log_likelihood = K.sum(log_gaussian(y_true, y_pred, std_prior))
 
-            kl = kl + K.sum(1.0 + 2.0*log_stdev - mean**2.0 - K.exp(2.0*log_stdev))/2.0
-            #(mean**2)/2 + (K.exp(2*stdev) - 1 - 2*stdev)/2)
-    return ce# - kl
+    return K.sum((log_q - log_p)/nb_batchs - log_likelihood)/batch_size
 
 
 model = Sequential()
@@ -91,7 +107,7 @@ if 'bayesian' in network:
     model.add(Bayesian(out_dim))
     model.add(Activation('softmax'))
     loss = bayesian_loss
-    loss = 'categorical_crossentropy' #bayesian_loss
+    # loss = 'categorical_crossentropy' #bayesian_loss
 elif network == 'mlp':
     model.add(Dense(hidden, input_shape=[in_dim]))
     model.add(Activation('relu'))
@@ -107,26 +123,16 @@ elif network == 'mlp-deterministic':
     model.add(Activation('softmax'))
     loss = 'categorical_crossentropy'
 
-#optimizer = SGD(lr=0.01, momentum=0.9, decay=1e-4, nesterov=True)
-#optimizer = Adam()
-optimizer = Adagrad()
-#optimizer = SGD()
-#optimizer = Adadelta()#clipnorm=1.0, clipvalue=1.0)
-#optimizer = RMSprop()
-model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
 
-weights_file = 'weights/'+dataset+'/'+network+'-best-weights.h5'
+model.compile(loss=loss, optimizer='adadelta', metrics=['accuracy'])
+
+#weights_file = 'weights/'+dataset+'/'+network+'-best-weights.h5'
+if train:
+    cbs = []
+    #cbs.append(ModelCheckpoint(weights_file, monitor='val_loss', save_best_only=True))
+    model.fit(X_train, y_train, nb_epoch=50, batch_size=batch_size, validation_split=0.2, callbacks=cbs)
 
 #model.load_weights(weights_file)
-
-if train:
-    mc = ModelCheckpoint(weights_file, monitor='val_loss', save_best_only=True)
-    tb = TensorBoard(log_dir='./logs', histogram_freq=1)
-    model.fit(X_train, y_train, nb_epoch=50, batch_size=batch_size,
-              validation_split=0.2, callbacks=[mc, tb])
-
-model.load_weights(weights_file)
-
 
 test_pred_mean = {x:[] for x in range(10)}
 test_pred_std = {x:[] for x in range(10)}
@@ -176,9 +182,23 @@ anomaly_detection(test_pred_std, "Standard deviation")
 anomaly_detection(test_entropy_bayesian, "Entropy")
 anomaly_detection(test_variation_ratio, "Variation ratio")
 
-"""
 
+
+"""
 --------------------------- MNIST ----------------------------
+
+
+ ########## bayesian mega blaster ##########
+Standard deviation  score   threshold   TP  TN
+    balanced acc    0.943   0.011       0.940   0.946
+    f1 score    0.943   0.011       0.940   0.946
+Entropy score   threshold   TP  TN
+    balanced acc    0.942   0.057       0.941   0.943
+    f1 score    0.942   0.061       0.945   0.939
+Variation ratio score   threshold   TP  TN
+    balanced acc    0.787   0.014       0.995   0.578
+    f1 score    0.823   0.014       0.995   0.578
+
 
 ########## batch bayesian ##########
 
@@ -237,6 +257,18 @@ Variation ratio score   threshold   TP  TN
     f1 score    0.667   0.014       1.000   0.000
 
 -------------------- CIFAR10 ----------------------
+
+
+ ########## bayesian mega blaster ##########
+Standard deviation  score   threshold   TP  TN
+    balanced acc    0.578   0.000       0.333   0.823
+    f1 score    0.667   3.037       1.000   0.000
+Entropy score   threshold   TP  TN
+    balanced acc    0.578   0.000       0.336   0.821
+    f1 score    0.667   3.037       1.000   0.000
+Variation ratio score   threshold   TP  TN
+    balanced acc    0.560   0.014       0.532   0.588
+    f1 score    0.667   3.037       1.000   0.000
 
  ########## mlp dropout ##########
 Standard deviation  score   threshold   TP  TN
