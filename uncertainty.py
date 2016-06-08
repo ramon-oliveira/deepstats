@@ -5,6 +5,7 @@ import numpy as np
 import datasets
 from keras.models import Sequential
 from keras.layers import Activation, Dense, Dropout
+from keras import objectives
 from keras.callbacks import ModelCheckpoint
 
 
@@ -15,7 +16,6 @@ class Bayesian(Layer):
         super(Bayesian, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        print(input_shape)
         input_dim = input_shape[1]
         shape = [input_shape[0], input_dim, self.output_dim]
         self.W = K.random_normal(shape, mean=0.0, std=std_prior)
@@ -31,7 +31,7 @@ class Bayesian(Layer):
         #return K.dot(x, self.W*self.log_sigma + self.mu) + self.bias
 
         # http://jmlr.org/proceedings/papers/v37/blundell15.pdf
-        self.W_sample = self.mean + self.W*K.log(1.0 + K.exp(self.log_std))
+        self.W_sample = self.W*K.log(1.0 + K.exp(self.log_std)) + self.mean
         return K.batch_dot(x, self.W_sample) + self.bias
 
     def get_output_shape_for(self, input_shape):
@@ -58,8 +58,7 @@ class MyDropout(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-
-batch_size = 5
+batch_size = 30
 hidden = 512
 dataset = 'cifar10'
 # bayesian*, mlp, mlp-deterministic
@@ -75,7 +74,7 @@ nb_batchs = X_train.shape[0]//batch_size
 std_prior = 0.05
 
 def log_gaussian(x, mean, std):
-    return -K.log(2*np.pi)/2.0 - K.log(K.abs(std)) - (x-mean)**2/(2*std**2)
+    return -K.log(2*np.pi)/2.0 - K.log(std) - (x-mean)**2/(2*std**2)
 
 def log_gaussian2(x, mean, log_std):
     log_var = 2*log_std
@@ -86,16 +85,18 @@ def bayesian_loss(y_true, y_pred):
     #log_likelihood = objectives.categorical_crossentropy(y_true, y_pred)
     log_p = K.variable(0.0)
     log_q = K.variable(0.0)
+    nb_samples = batch_size
     for layer in model.layers:
         if type(layer) is Bayesian:
             mean = layer.mean
             log_std = layer.log_std
             W_sample = layer.W_sample
             # prior
-            log_p += K.sum(log_gaussian(W_sample, 0.0, std_prior))
+            log_p += K.sum(log_gaussian(W_sample, 0.0, std_prior))/nb_samples
             # posterior
-            log_q += K.sum(log_gaussian2(W_sample, mean, log_std))
+            log_q += K.sum(log_gaussian2(W_sample, mean, log_std))/nb_samples
 
+    #log_likelihood = objectives.categorical_crossentropy(y_true, y_pred)
     log_likelihood = K.sum(log_gaussian(y_true, y_pred, std_prior))
 
     return K.sum((log_q - log_p)/nb_batchs - log_likelihood)/batch_size
@@ -131,7 +132,8 @@ model.compile(loss=loss, optimizer='adadelta', metrics=['accuracy'])
 if train:
     cbs = []
     #cbs.append(ModelCheckpoint(weights_file, monitor='val_loss', save_best_only=True))
-    model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size, validation_split=0.2, callbacks=cbs)
+    mod = X_train.shape[0]%batch_size
+    model.fit(X_train[:-mod], y_train[:-mod], nb_epoch=10, batch_size=batch_size)
 
 #model.load_weights(weights_file)
 '''
