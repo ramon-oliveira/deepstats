@@ -8,6 +8,8 @@ from keras.layers import Activation, Dense, Dropout, ELU
 import time
 import pandas as pd
 
+# http://jmlr.org/proceedings/papers/v37/blundell15.pdf
+
 
 class Bayesian(Layer):
 
@@ -19,7 +21,34 @@ class Bayesian(Layer):
 
     def build(self, input_shape):
         input_dim = input_shape[1]
-        shape = [input_shape[0], input_dim, self.output_dim]
+        shape = [input_dim, self.output_dim]
+        self.W = K.random_normal([input_shape[0]]+shape, mean=self.mean_prior, std=self.std_prior)
+        v = np.sqrt(6.0 / (input_dim + self.output_dim))
+        self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
+        self.log_std = K.variable(np.random.uniform(low=-v, high=v, size=shape))
+        self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]))
+
+        self.trainable_weights = [self.mean, self.log_std, self.bias]
+
+    def call(self, x, mask=None):
+        self.W_sample = self.W*K.log(1.0 + K.exp(self.log_std)) + self.mean
+        return K.batch_dot(x, self.W_sample) + self.bias
+
+    def get_output_shape_for(self, input_shape):
+        return (input_shape[0], self.output_dim)
+
+
+class PoorBayesian(Layer):
+
+    def __init__(self, output_dim, mean_prior, std_prior, **kwargs):
+        self.output_dim = output_dim
+        self.mean_prior = mean_prior
+        self.std_prior = std_prior
+        super(PoorBayesian, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        input_dim = input_shape[1]
+        shape = [input_dim, self.output_dim]
         self.W = K.random_normal(shape, mean=self.mean_prior, std=self.std_prior)
         v = np.sqrt(6.0 / (input_dim + self.output_dim))
         self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
@@ -29,12 +58,8 @@ class Bayesian(Layer):
         self.trainable_weights = [self.mean, self.log_std, self.bias]
 
     def call(self, x, mask=None):
-        #return K.dot(x, self.W*K.exp(self.log_sigma) + self.mu) + self.bias
-        #return K.dot(x, self.W*self.log_sigma + self.mu) + self.bias
-
-        # http://jmlr.org/proceedings/papers/v37/blundell15.pdf
         self.W_sample = self.W*K.log(1.0 + K.exp(self.log_std)) + self.mean
-        return K.batch_dot(x, self.W_sample) + self.bias
+        return K.dot(x, self.W_sample) + self.bias
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.output_dim)
@@ -100,9 +125,19 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
         network: [bayesian, mlp-dropout, mlp]
     """
     assert dataset in ['mnist', 'cifar10']
-    assert network in ['bayesian', 'mlp-dropout', 'mlp']
+    assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp']
     assert len(hidden_layers) >= 1
     assert len(inside_labels) >= 2
+
+    print('#'*50)
+    print('#'*50)
+    print('Experiment:', name)
+    print('Network:', network)
+    print('Dataset:', dataset)
+    print('Inside Labels:', str(inside_labels))
+    print('Number of epochs:', nb_epochs)
+    print('Batch size:', batch_size)
+    print('-'*50)
 
     (X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, inside_labels)
 
@@ -114,13 +149,22 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
     std_prior = 0.05
 
     model = Sequential()
-    if 'bayesian' in network:
+    if network == 'bayesian':
         model.add(Bayesian(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
         model.add(ELU())
         for h in hidden_layers[1:]:
             model.add(Bayesian(h, mean_prior, std_prior))
             model.add(ELU())
         model.add(Bayesian(out_dim, mean_prior, std_prior))
+        model.add(Activation('softmax'))
+        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+    elif network == 'poor-bayesian':
+        model.add(PoorBayesian(hidden_layers[0], mean_prior, std_prior, input_shape=[in_dim]))
+        model.add(ELU())
+        for h in hidden_layers[1:]:
+            model.add(PoorBayesian(h, mean_prior, std_prior))
+            model.add(ELU())
+        model.add(PoorBayesian(out_dim, mean_prior, std_prior))
         model.add(Activation('softmax'))
         loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
     elif network == 'mlp-dropout':
@@ -146,8 +190,11 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
 
     model.compile(loss=loss, optimizer='adadelta', metrics=['accuracy'])
     mod = X_train.shape[0]%batch_size
+    if mod:
+        X_train = X_train[:-mod]
+        y_train = y_train[:-mod]
     start_time = time.time()
-    model.fit(X_train[:-mod], y_train[:-mod], nb_epoch=nb_epochs, batch_size=batch_size)
+    model.fit(X_train, y_train, nb_epoch=nb_epochs, batch_size=batch_size)
     end_time = time.time()
 
     test_pred_std = {x:[] for x in range(10)}
@@ -157,7 +204,10 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
     acc_in = 0
 
     for i, (x, y) in enumerate(zip(X_test, y_test)):
-        probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
+        if network == 'poor-bayesian':
+            probs = model.predict(np.array([x]*batch_size), batch_size=1)
+        else:
+            probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
         pred_mean = probs.mean(axis=0)
         pred_std = probs.std(axis=0)
         entropy = scipy.stats.entropy(pred_mean)
@@ -202,9 +252,7 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
         df.set_value(name, metric_name + ' f1_score', sorted_acc[0][1][1])
         df.set_value(name, metric_name + ' f1_score_threshold', sorted_acc[0][0])
 
-
-    print('\n\n')
-    print('#'*10, network, '#'*10)
+    print('-'*50)
     df = pd.DataFrame()
     df.set_value(name, "train_time", end_time - start_time)
     df.set_value(name, "dataset", dataset)
