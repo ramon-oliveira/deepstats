@@ -115,23 +115,37 @@ def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
     return loss
 
 
-def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
+def model_test(model, batch_size, X_test, y_test, labels_to_test):
+    cnt = 0
+    acc = 0
+    for x, y in zip(X_test, y_test):
+        if y in labels_to_test:
+            cnt += 1
+            probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
+            pred_mean = probs.mean(axis=0)
+            o = np.argmax(pred_mean)
+            if o == labels_to_test.index(y):
+                acc += 1
+    return acc/cnt
+
+
+def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, acc_threshold, nb_epochs, batch_size=100,
             hidden_layers=[512, 512], dropout_p=0.5):
     """
 
     # Arguments
         name: experiment name
-        dataset: [mnist, cifar10]
+        dataset: [mnist, cifar]
         network: [bayesian, mlp-dropout, mlp]
     """
-    assert dataset in ['mnist', 'cifar10']
+    assert dataset in ['mnist', 'cifar']
     assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp']
     assert len(hidden_layers) >= 1
     assert len(inside_labels) >= 2
 
     print('#'*50)
     print('#'*50)
-    print('Experiment:', name)
+    print('Experiment:', experiment_name)
     print('Network:', network)
     print('Dataset:', dataset)
     print('Inside Labels:', str(inside_labels))
@@ -139,7 +153,7 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
     print('Batch size:', batch_size)
     print('-'*50)
 
-    (X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, inside_labels)
+    (X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, inside_labels, unknown_labels)
 
     in_dim = X_train.shape[1]
     out_dim = y_train.shape[1]
@@ -158,6 +172,7 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
         model.add(Bayesian(out_dim, mean_prior, std_prior))
         model.add(Activation('softmax'))
         loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+
     elif network == 'poor-bayesian':
         model.add(PoorBayesian(hidden_layers[0], mean_prior, std_prior, input_shape=[in_dim]))
         model.add(ELU())
@@ -167,6 +182,7 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
         model.add(PoorBayesian(out_dim, mean_prior, std_prior))
         model.add(Activation('softmax'))
         loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+
     elif network == 'mlp-dropout':
         model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
         model.add(ELU())
@@ -177,6 +193,7 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
         model.add(Dense(out_dim))
         model.add(Activation('softmax'))
         loss = 'categorical_crossentropy'
+
     elif network == 'mlp-deterministic':
         model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
         model.add(ELU())
@@ -194,8 +211,14 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
         X_train = X_train[:-mod]
         y_train = y_train[:-mod]
     start_time = time.time()
-    model.fit(X_train, y_train, nb_epoch=nb_epochs, batch_size=batch_size)
+    for epoch in range(0, nb_epochs, 5):
+        model.fit(X_train, y_train, nb_epoch=5, batch_size=batch_size)
+        tacc = model_test(model, batch_size, X_test, y_test, inside_labels)
+        print('Test acc:', tacc)
+        if tacc > acc_threshold:
+            break
     end_time = time.time()
+    model.save_weights('weights/'+dataset+'/'+experiment_name+'.h5', overwrite=True)
 
     test_pred_std = {x:[] for x in range(10)}
     test_entropy_bayesian = {x:[] for x in range(10)}
@@ -231,12 +254,16 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
             tp = 0.0
             tn = 0.0
             for l in anomaly_score_dict:
+                if l in unknown_labels:
+                    continue
+
                 if l in inside_labels:
                     tp += (np.array(anomaly_score_dict[l]) < t).mean()
                 else:
                     tn += (np.array(anomaly_score_dict[l]) >= t).mean()
+
             tp /= len(inside_labels)
-            tn /= 10.0 - len(inside_labels)
+            tn /= (10.0 - len(unknown_labels)) - len(inside_labels)
             bal_acc = (tp + tn)/2.0
             f1_score = 2.0*tp/(2.0 + tp - tn)
             acc[t] = [bal_acc, f1_score, tp, tn]
@@ -244,21 +271,22 @@ def anomaly(name, network, dataset, inside_labels, nb_epochs, batch_size,
         print("{}\tscore\tthreshold\tTP\tTN".format(metric_name))
         sorted_acc = sorted(acc.items(), key= lambda x : x[1][0], reverse = True)
         print("\tbalanced acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
-        df.set_value(name, metric_name + " bal_acc", sorted_acc[0][1][0])
-        df.set_value(name, metric_name + " bal_acc_threshold", sorted_acc[0][0])
+        df.set_value(experiment_name, metric_name + " bal_acc", sorted_acc[0][1][0])
+        df.set_value(experiment_name, metric_name + " bal_acc_threshold", sorted_acc[0][0])
 
         sorted_acc = sorted(acc.items(), key= lambda x : x[1][1], reverse = True)
         print("\tf1 score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
-        df.set_value(name, metric_name + ' f1_score', sorted_acc[0][1][1])
-        df.set_value(name, metric_name + ' f1_score_threshold', sorted_acc[0][0])
+        df.set_value(experiment_name, metric_name + ' f1_score', sorted_acc[0][1][1])
+        df.set_value(experiment_name, metric_name + ' f1_score_threshold', sorted_acc[0][0])
 
     print('-'*50)
     df = pd.DataFrame()
-    df.set_value(name, "train_time", end_time - start_time)
-    df.set_value(name, "dataset", dataset)
-    df.set_value(name, "test_acc", acc_in/cnt_in)
-    df.set_value(name, "inside_labels", str(inside_labels))
-    df.set_value(name, "nb_epochs", nb_epochs)
+    df.set_value(experiment_name, "train_time", end_time - start_time)
+    df.set_value(experiment_name, "dataset", dataset)
+    df.set_value(experiment_name, "test_acc", acc_in/cnt_in)
+    df.set_value(experiment_name, "inside_labels", str(inside_labels))
+    df.set_value(experiment_name, "unknown_labels", str(unknown_labels))
+    df.set_value(experiment_name, "nb_epochs", nb_epochs)
     anomaly_detection(test_pred_std, "Bayesian prediction STD", df)
     anomaly_detection(test_entropy_bayesian, "Bayesian entropy", df)
     return df
