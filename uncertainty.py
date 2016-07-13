@@ -1,119 +1,13 @@
-from keras import backend as K
-from keras.engine.topology import Layer
 import scipy.stats
 import numpy as np
-import datasets
+import dataloader
 from keras.models import Sequential
 from keras.layers import Activation, Dense, Dropout, ELU
+from layers import Bayesian, PoorBayesian, ProbabilisticDropout
+from objectives import bayesian_loss
 import time
 import pandas as pd
-
-# http://jmlr.org/proceedings/papers/v37/blundell15.pdf
-
-
-class Bayesian(Layer):
-
-    def __init__(self, output_dim, mean_prior, std_prior, **kwargs):
-        self.output_dim = output_dim
-        self.mean_prior = mean_prior
-        self.std_prior = std_prior
-        super(Bayesian, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        input_dim = input_shape[1]
-        shape = [input_dim, self.output_dim]
-        self.W = K.random_normal([input_shape[0]]+shape, mean=self.mean_prior, std=self.std_prior)
-        v = np.sqrt(6.0 / (input_dim + self.output_dim))
-        self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
-        self.log_std = K.variable(np.random.uniform(low=-v, high=v, size=shape))
-        self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]))
-
-        self.trainable_weights = [self.mean, self.log_std, self.bias]
-
-    def call(self, x, mask=None):
-        self.W_sample = self.W*K.log(1.0 + K.exp(self.log_std)) + self.mean
-        return K.batch_dot(x, self.W_sample) + self.bias
-
-    def get_output_shape_for(self, input_shape):
-        return (input_shape[0], self.output_dim)
-
-
-class PoorBayesian(Layer):
-
-    def __init__(self, output_dim, mean_prior, std_prior, **kwargs):
-        self.output_dim = output_dim
-        self.mean_prior = mean_prior
-        self.std_prior = std_prior
-        super(PoorBayesian, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        input_dim = input_shape[1]
-        shape = [input_dim, self.output_dim]
-        self.W = K.random_normal(shape, mean=self.mean_prior, std=self.std_prior)
-        v = np.sqrt(6.0 / (input_dim + self.output_dim))
-        self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
-        self.log_std = K.variable(np.random.uniform(low=-v, high=v, size=shape))
-        self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]))
-
-        self.trainable_weights = [self.mean, self.log_std, self.bias]
-
-    def call(self, x, mask=None):
-        self.W_sample = self.W*K.log(1.0 + K.exp(self.log_std)) + self.mean
-        return K.dot(x, self.W_sample) + self.bias
-
-    def get_output_shape_for(self, input_shape):
-        return (input_shape[0], self.output_dim)
-
-
-class MyDropout(Layer):
-
-    def __init__(self, p, **kwargs):
-        self.p = p
-        if 0. < self.p < 1.:
-            self.uses_learning_phase = True
-        self.supports_masking = True
-        super(MyDropout, self).__init__(**kwargs)
-
-    def call(self, x, mask=None):
-        if 0. < self.p < 1.:
-            x = K.dropout(x, level=self.p)
-        return x
-
-    def get_config(self):
-        config = {'p': self.p}
-        base_config = super(MyDropout, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
-
-
-def log_gaussian(x, mean, std):
-    return -K.log(2*np.pi)/2.0 - K.log(std) - (x-mean)**2/(2*std**2)
-
-def log_gaussian2(x, mean, log_std):
-    log_var = 2*log_std
-    return -K.log(2*np.pi)/2.0 - log_var/2.0 - (x-mean)**2/(2*K.exp(log_var))
-
-
-def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
-    def loss(y_true, y_pred):
-        log_p = K.variable(0.0)
-        log_q = K.variable(0.0)
-        nb_samples = batch_size
-        for layer in model.layers:
-            if type(layer) is Bayesian:
-                mean = layer.mean
-                log_std = layer.log_std
-                W_sample = layer.W_sample
-                # prior
-                log_p += K.sum(log_gaussian(W_sample, mean_prior, std_prior))/nb_samples
-                # posterior
-                log_q += K.sum(log_gaussian2(W_sample, mean, log_std))/nb_samples
-
-        #log_likelihood = objectives.categorical_crossentropy(y_true, y_pred)
-        log_likelihood = K.sum(log_gaussian(y_true, y_pred, std_prior))
-
-        return K.sum((log_q - log_p)/nb_batchs - log_likelihood)/batch_size
-    return loss
-
+from sklearn import metrics
 
 def model_test(model, batch_size, X_test, y_test, labels_to_test):
     cnt = 0
@@ -129,15 +23,12 @@ def model_test(model, batch_size, X_test, y_test, labels_to_test):
     return acc/cnt
 
 
-def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, acc_threshold, nb_epochs, batch_size=100,
-            hidden_layers=[512, 512], dropout_p=0.5):
-    """
-
-    # Arguments
-        name: experiment name
-        dataset: [mnist, cifar]
-        network: [bayesian, mlp-dropout, mlp]
-    """
+def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, with_unknown,
+            batch_size=100,
+            max_epochs=100,
+            hidden_layers=[512, 512],
+            acc_threshold=0.98,
+            dropout_p=0.5):
     assert dataset in ['mnist', 'cifar']
     assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp']
     assert len(hidden_layers) >= 1
@@ -149,11 +40,16 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, ac
     print('Network:', network)
     print('Dataset:', dataset)
     print('Inside Labels:', str(inside_labels))
-    print('Number of epochs:', nb_epochs)
+    print('Unknown Labels:', str(unknown_labels))
     print('Batch size:', batch_size)
+    print('Max epochs:', max_epochs)
     print('-'*50)
 
-    (X_train, y_train), (X_test, y_test) = datasets.load_data(dataset, inside_labels, unknown_labels)
+    inside_labels.sort()
+    unknown_labels.sort()
+
+    (X_train, y_train), (X_test, y_test) = dataloader.load(dataset, inside_labels,
+                                                           unknown_labels, with_unknown)
 
     in_dim = X_train.shape[1]
     out_dim = y_train.shape[1]
@@ -189,7 +85,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, ac
         for h in hidden_layers[1:]:
             model.add(Dense(h))
             model.add(ELU())
-            model.add(MyDropout(dropout_p))
+            model.add(ProbabilisticDropout(dropout_p))
         model.add(Dense(out_dim))
         model.add(Activation('softmax'))
         loss = 'categorical_crossentropy'
@@ -210,15 +106,21 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, ac
     if mod:
         X_train = X_train[:-mod]
         y_train = y_train[:-mod]
+
+    print(X_train.shape, y_train.shape, batch_size)
     start_time = time.time()
-    for epoch in range(0, nb_epochs, 5):
+    for epoch in range(0, max_epochs, 5):
         model.fit(X_train, y_train, nb_epoch=5, batch_size=batch_size)
         tacc = model_test(model, batch_size, X_test, y_test, inside_labels)
         print('Test acc:', tacc)
-        if tacc > acc_threshold:
+        if tacc >= acc_threshold:
             break
     end_time = time.time()
-    model.save_weights('weights/'+dataset+'/'+experiment_name+'.h5', overwrite=True)
+
+    if with_unknown:
+        model.save_weights('weights/'+dataset+'-with-unknown/'+experiment_name+'.h5', overwrite=True)
+    else:
+        model.save_weights('weights/'+dataset+'-without-unknown/'+experiment_name+'.h5', overwrite=True)
 
     test_pred_std = {x:[] for x in range(10)}
     test_entropy_bayesian = {x:[] for x in range(10)}
@@ -268,16 +170,29 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, ac
             f1_score = 2.0*tp/(2.0 + tp - tn)
             acc[t] = [bal_acc, f1_score, tp, tn]
 
-        print("{}\tscore\tthreshold\tTP\tTN".format(metric_name))
-        sorted_acc = sorted(acc.items(), key= lambda x : x[1][0], reverse = True)
-        print("\tbalanced acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
-        df.set_value(experiment_name, metric_name + " bal_acc", sorted_acc[0][1][0])
-        df.set_value(experiment_name, metric_name + " bal_acc_threshold", sorted_acc[0][0])
+        trues = []
+        scores = []
+        for l in anomaly_score_dict:
+            if l in unknown_labels: continue
 
-        sorted_acc = sorted(acc.items(), key= lambda x : x[1][1], reverse = True)
-        print("\tf1 score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
-        df.set_value(experiment_name, metric_name + ' f1_score', sorted_acc[0][1][1])
-        df.set_value(experiment_name, metric_name + ' f1_score_threshold', sorted_acc[0][0])
+            scores += anomaly_score_dict[l]
+            if l in inside_labels:
+                trues += [1]*len(anomaly_score_dict[l])
+            else:
+                trues += [0]*len(anomaly_score_dict[l])
+        assert len(trues) == len(scores)
+
+        auc = metrics.roc_auc_score(trues, scores)
+
+        print("{}\tscore\tthreshold\tTP\tTN".format(metric_name))
+        sorted_acc = sorted(acc.items(), key=lambda x: x[1][0], reverse=True)
+        print("\tbalanced_acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
+        df.set_value(experiment_name, metric_name + "_bal_acc", sorted_acc[0][1][0])
+
+        sorted_acc = sorted(acc.items(), key=lambda x: x[1][1], reverse=True)
+        print("\tf1_score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
+        df.set_value(experiment_name, metric_name + '_f1_score', sorted_acc[0][1][1])
+        df.set_value(experiment_name, metric_name + "_auc", auc)
 
     print('-'*50)
     df = pd.DataFrame()
@@ -286,7 +201,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, ac
     df.set_value(experiment_name, "test_acc", acc_in/cnt_in)
     df.set_value(experiment_name, "inside_labels", str(inside_labels))
     df.set_value(experiment_name, "unknown_labels", str(unknown_labels))
-    df.set_value(experiment_name, "nb_epochs", nb_epochs)
-    anomaly_detection(test_pred_std, "Bayesian prediction STD", df)
-    anomaly_detection(test_entropy_bayesian, "Bayesian entropy", df)
+    df.set_value(experiment_name, "max_epochs", max_epochs)
+    anomaly_detection(test_pred_std, "bayesian_prediction_std", df)
+    anomaly_detection(test_entropy_bayesian, "bayesian_entropy", df)
     return df
