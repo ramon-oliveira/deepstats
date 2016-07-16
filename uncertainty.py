@@ -107,7 +107,6 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
         X_train = X_train[:-mod]
         y_train = y_train[:-mod]
 
-    print(X_train.shape, y_train.shape, batch_size)
     start_time = time.time()
     for epoch in range(0, max_epochs, 5):
         model.fit(X_train, y_train, nb_epoch=5, batch_size=batch_size)
@@ -177,9 +176,9 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
 
             scores += anomaly_score_dict[l]
             if l in inside_labels:
-                trues += [1]*len(anomaly_score_dict[l])
-            else:
                 trues += [0]*len(anomaly_score_dict[l])
+            else:
+                trues += [1]*len(anomaly_score_dict[l])
         assert len(trues) == len(scores)
 
         auc = metrics.roc_auc_score(trues, scores)
@@ -193,6 +192,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
         print("\tf1_score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
         df.set_value(experiment_name, metric_name + '_f1_score', sorted_acc[0][1][1])
         df.set_value(experiment_name, metric_name + "_auc", auc)
+        return df
 
     print('-'*50)
     df = pd.DataFrame()
@@ -202,6 +202,6 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     df.set_value(experiment_name, "inside_labels", str(inside_labels))
     df.set_value(experiment_name, "unknown_labels", str(unknown_labels))
     df.set_value(experiment_name, "max_epochs", max_epochs)
-    anomaly_detection(test_pred_std, "bayesian_prediction_std", df)
-    anomaly_detection(test_entropy_bayesian, "bayesian_entropy", df)
+    df = anomaly_detection(test_pred_std, "bayesian_prediction_std", df)
+    df = anomaly_detection(test_entropy_bayesian, "bayesian_entropy", df)
     return df

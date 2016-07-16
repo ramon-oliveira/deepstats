@@ -73,7 +73,7 @@ except:
 
 for experiment, network, dataset, inside_labels, unknown_labels in params:
     out = anomaly(experiment, network, dataset, inside_labels, unknown_labels, with_unknown=True)
-    df.append(out)
+    df = df.append(out)
     df.to_csv('bayesian_uncertainty_with_unknown.csv', index=False)
     gc.collect()
 
@@ -85,6 +85,6 @@ except:
 
 for experiment, network, dataset, inside_labels, unknown_labels in params:
     out = anomaly(experiment, network, dataset, inside_labels, unknown_labels, with_unknown=False)
-    df.append(out)
+    df = df.append(out)
     df.to_csv('bayesian_uncertainty_without_unknown.csv', index=False)
     gc.collect()
