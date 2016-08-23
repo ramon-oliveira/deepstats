@@ -28,9 +28,10 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
             max_epochs=100,
             hidden_layers=[512, 512],
             acc_threshold=0.98,
-            dropout_p=0.5):
+            dropout_p=0.5,
+            save_weights=False):
     assert dataset in ['mnist', 'cifar']
-    assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp']
+    assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp-deterministic']
     assert len(hidden_layers) >= 1
     assert len(inside_labels) >= 2
 
@@ -116,9 +117,9 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
             break
     end_time = time.time()
 
-    if with_unknown:
+    if save_weights and with_unknown:
         model.save_weights('weights/'+dataset+'-with-unknown/'+experiment_name+'.h5', overwrite=True)
-    else:
+    elif save_weights:
         model.save_weights('weights/'+dataset+'-without-unknown/'+experiment_name+'.h5', overwrite=True)
 
     test_pred_std = {x:[] for x in range(10)}

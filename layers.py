@@ -63,7 +63,7 @@ class PoorBayesian(Layer):
 
 class ProbabilisticDropout(Layer):
 
-    """Probabilistic Dropout (performs dropout at test time too)"""
+    """Probabilistic Dropout (performs dropout at test time)"""
 
     def __init__(self, p, **kwargs):
         self.p = p
