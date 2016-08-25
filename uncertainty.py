@@ -27,7 +27,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
             batch_size=100,
             max_epochs=100,
             hidden_layers=[512, 512],
-            acc_threshold=0.98,
+            acc_threshold=0.99,
             dropout_p=0.5,
             save_weights=False):
     assert dataset in ['mnist', 'cifar']
@@ -102,15 +102,15 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
         model.add(Activation('softmax'))
         loss = 'categorical_crossentropy'
 
-    model.compile(loss=loss, optimizer='adadelta', metrics=['accuracy'])
+    model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
     mod = X_train.shape[0]%batch_size
     if mod:
         X_train = X_train[:-mod]
         y_train = y_train[:-mod]
-
     start_time = time.time()
-    for epoch in range(0, max_epochs, 5):
-        model.fit(X_train, y_train, nb_epoch=5, batch_size=batch_size)
+    
+    for epoch in range(1, max_epochs):
+        model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size)
         tacc = model_test(model, batch_size, X_test, y_test, inside_labels)
         print('Test acc:', tacc)
         if tacc >= acc_threshold:
@@ -202,7 +202,9 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     df.set_value(experiment_name, "test_acc", acc_in/cnt_in)
     df.set_value(experiment_name, "inside_labels", str(inside_labels))
     df.set_value(experiment_name, "unknown_labels", str(unknown_labels))
+    df.set_value(experiment_name, "epochs", epoch)
     df.set_value(experiment_name, "max_epochs", max_epochs)
-    df = anomaly_detection(test_pred_std, "bayesian_prediction_std", df)
-    df = anomaly_detection(test_entropy_bayesian, "bayesian_entropy", df)
+    df = anomaly_detection(test_pred_std, "bayesian_prediction_std_", df)
+    df = anomaly_detection(test_entropy_bayesian, "bayesian_entropy_", df)
     return df
+    

@@ -65,6 +65,7 @@ params = [
     ['test_mnist_4labels_2unknown_20.3', 'bayesian', 'mnist', [4, 8, 7, 3], [9, 2]],
 ]
 
+# With unknown labels as part of the training sets (with the unknown classes labels set to 0.5)
 
 try:
     df = pd.read_csv('bayesian_uncertainty_with_unknown.csv')
@@ -77,6 +78,7 @@ for experiment, network, dataset, inside_labels, unknown_labels in params:
     df.to_csv('bayesian_uncertainty_with_unknown.csv', index=False)
     gc.collect()
 
+# Without unknown labels in the training set
 
 try:
     df = pd.read_csv('bayesian_uncertainty_without_unknown.csv')
