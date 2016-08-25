@@ -47,9 +47,9 @@ class PoorBayesian(Layer):
         shape = [input_dim, self.output_dim]
         self.W = K.random_normal(shape, mean=self.mean_prior, std=self.std_prior)
         v = np.sqrt(6.0 / (input_dim + self.output_dim))
-        self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape))
-        self.log_std = K.variable(np.random.uniform(low=-v, high=v, size=shape))
-        self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]))
+        self.mean = K.variable(np.random.uniform(low=-v, high=v, size=shape), name='mean')
+        self.log_std = K.variable(np.random.uniform(low=-v, high=v, size=shape), name='log_std')
+        self.bias = K.variable(np.random.uniform(low=-v, high=v, size=[self.output_dim]), name='bias')
 
         self.trainable_weights = [self.mean, self.log_std, self.bias]
 
