@@ -6,7 +6,7 @@ from keras import objectives
 # KL divergence between normal and standard normal N(0, I)
 def KL_standard_normal(mean, log_std):
     return (-1.0 - 2.0*log_std + mean**2.0 + 2.0*K.exp(log_std))/2.0
-    
+
 # Following "Weight Uncertainty in Neural Networks" by Blundell et al.
 def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
     def loss(y_true, y_pred):
@@ -15,11 +15,12 @@ def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
             if type(layer) is Bayesian:
                 mean = layer.mean
                 log_std = layer.log_std
-                KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std))/batch_size
-                    
+                # KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std))/batch_size
+                KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std))
+
         # Classification
         log_likelihood = -objectives.categorical_crossentropy(y_true, y_pred)
-        
+
         # Regression
         #log_likelihood = K.sum(log_gaussian(y_true, y_pred, std_prior))
 
@@ -51,7 +52,7 @@ def old_bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
 
         # Classification
         log_likelihood = -objectives.categorical_crossentropy(y_true, y_pred)
-        
+
         # Regression
         #log_likelihood = K.sum(log_gaussian(y_true, y_pred, std_prior))
 

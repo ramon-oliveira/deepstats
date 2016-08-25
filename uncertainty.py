@@ -36,7 +36,6 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     assert len(inside_labels) >= 2
 
     print('#'*50)
-    print('#'*50)
     print('Experiment:', experiment_name)
     print('Network:', network)
     print('Dataset:', dataset)
@@ -108,7 +107,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
         X_train = X_train[:-mod]
         y_train = y_train[:-mod]
     start_time = time.time()
-    
+
     for epoch in range(1, max_epochs):
         model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size)
         tacc = model_test(model, batch_size, X_test, y_test, inside_labels)
@@ -207,4 +206,3 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     df = anomaly_detection(test_pred_std, "bayesian_prediction_std_", df)
     df = anomaly_detection(test_entropy_bayesian, "bayesian_entropy_", df)
     return df
-    
