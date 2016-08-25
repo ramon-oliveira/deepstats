@@ -15,8 +15,7 @@ def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
             if type(layer) is Bayesian:
                 mean = layer.mean
                 log_std = layer.log_std
-                # KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std))/batch_size
-                KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std))
+                KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std))/batch_size
 
         # Classification
         log_likelihood = -objectives.categorical_crossentropy(y_true, y_pred)
