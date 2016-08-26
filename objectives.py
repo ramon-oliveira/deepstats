@@ -3,23 +3,27 @@ from layers import Bayesian
 import keras.backend as K
 from keras import objectives
 
-# KL divergence between normal and standard normal N(0, I)
-def KL_standard_normal(mean, log_std):
-    return (-1.0 - 2.0*log_std + mean**2.0 + 2.0*K.exp(log_std))/2.0
+# KL divergence between normal and a scaled standard normal N(0, exp(2.0*prior_log_std)*I)
+# The prior variance is found via empirical Bayes
+def KL_standard_normal(mean, log_std, prior_log_std):
+    return -0.5 + prior_log_std - log_std + (mean**2.0 + K.exp(2.0*log_std))/(2.0*K.exp(2.0*prior_log_std))
 
 # Following "Weight Uncertainty in Neural Networks" by Blundell et al.
 def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
     def loss(y_true, y_pred):
         KL_prior_posterior = K.variable(0.0)
+        prior_log_std = K.variable(0.0, name = "prior_log_std") # Variance prior
         for layer in model.layers:
             if type(layer) is Bayesian:
                 mean = layer.mean
                 log_std = layer.log_std
-                KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std))/batch_size
-
+                KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std, prior_log_std))/batch_size
+        
+        # Empirical Bayes (variance prior set using maximum likelihood)
+        model.layers[-1].trainable_weights.append(prior_log_std)
         # Classification
         log_likelihood = -objectives.categorical_crossentropy(y_true, y_pred)
-
+        
         # Regression
         #log_likelihood = K.sum(log_gaussian(y_true, y_pred, std_prior))
 
