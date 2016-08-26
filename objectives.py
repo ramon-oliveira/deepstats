@@ -1,5 +1,5 @@
 import numpy as np
-from layers import Bayesian
+from layers import Bayesian, PoorBayesian
 import keras.backend as K
 from keras import objectives
 
@@ -12,18 +12,18 @@ def KL_standard_normal(mean, log_std, prior_log_std):
 def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
     def loss(y_true, y_pred):
         KL_prior_posterior = K.variable(0.0)
-        prior_log_std = K.variable(0.0, name = "prior_log_std") # Variance prior
+        prior_log_std = K.variable(0.0, name="prior_log_std") # Variance prior
         for layer in model.layers:
-            if type(layer) is Bayesian:
+            if type(layer) is Bayesian or type(layer) is PoorBayesian:
                 mean = layer.mean
                 log_std = layer.log_std
                 KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std, prior_log_std))/batch_size
-        
+
         # Empirical Bayes (variance prior set using maximum likelihood)
         model.layers[-1].trainable_weights.append(prior_log_std)
         # Classification
         log_likelihood = -objectives.categorical_crossentropy(y_true, y_pred)
-        
+
         # Regression
         #log_likelihood = K.sum(log_gaussian(y_true, y_pred, std_prior))
 
@@ -44,7 +44,7 @@ def old_bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
         log_q = K.variable(0.0)
         nb_samples = batch_size
         for layer in model.layers:
-            if type(layer) is Bayesian:
+            if type(layer) is Bayesian or type(layer) is PoorBayesian:
                 mean = layer.mean
                 log_std = layer.log_std
                 W_sample = layer.W_sample
