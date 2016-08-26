@@ -111,7 +111,9 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     for epoch in range(1, max_epochs):
         model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size)
         tacc = model_test(model, batch_size, X_test, y_test, inside_labels)
-        print('Test acc:', tacc, 'prior_log_std', model.layers[-1].trainable_weights[0].get_value())
+        print('Test acc:', tacc)
+        if 'bayesian' in network:
+            print('prior_log_std:', model.layers[-1].trainable_weights[0].get_value())
         if tacc >= acc_threshold:
             break
     end_time = time.time()
