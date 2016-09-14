@@ -12,6 +12,8 @@ def load(dataset, inside_labels, unknown_labels, with_unknown):
     unknown_labels.sort()
 
     (X_train, y_train), (X_test, y_test) = data.load_data()
+    y_train = y_train.reshape(-1)
+    y_test = y_test.reshape(-1)
 
     idxs_labels = defaultdict(list)
     for i, label in enumerate(y_train):
