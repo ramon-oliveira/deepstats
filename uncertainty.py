@@ -106,16 +106,9 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     if mod:
         X_train = X_train[:-mod]
         y_train = y_train[:-mod]
-    start_time = time.time()
 
-    for epoch in range(1, max_epochs):
-        model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size)
-        tacc = model_test(model, batch_size, X_test, y_test, inside_labels)
-        print('Test acc:', tacc)
-        if 'bayesian' in network:
-            print('prior_log_std:', model.layers[-1].trainable_weights[0].get_value())
-        if tacc >= acc_threshold:
-            break
+    start_time = time.time()
+    model.fit(X_train, y_train, nb_epoch=max_epochs, batch_size=batch_size)
     end_time = time.time()
 
     if save_weights and with_unknown:
@@ -203,7 +196,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     df.set_value(experiment_name, "test_acc", acc_in/cnt_in)
     df.set_value(experiment_name, "inside_labels", str(inside_labels))
     df.set_value(experiment_name, "unknown_labels", str(unknown_labels))
-    df.set_value(experiment_name, "epochs", epoch)
+    df.set_value(experiment_name, "epochs", max_epochs)
     df.set_value(experiment_name, "max_epochs", max_epochs)
     df = anomaly_detection(test_pred_std, "bayesian_prediction_std_", df)
     df = anomaly_detection(test_entropy_bayesian, "bayesian_entropy_", df)
