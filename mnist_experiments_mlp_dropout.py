@@ -68,25 +68,25 @@ params = [
 # With unknown labels as part of the training sets (with the unknown classes labels set to 0.5)
 
 try:
-    df = pd.read_csv('mlp_dropout_uncertainty_with_unknown.csv')
+    df = pd.read_csv('mnist_results/mlp_dropout_uncertainty_with_unknown.csv')
 except:
     df = pd.DataFrame()
 
 for experiment, network, dataset, inside_labels, unknown_labels in params:
     out = anomaly(experiment, network, dataset, inside_labels, unknown_labels, with_unknown=True)
     df = df.append(out)
-    df.to_csv('mlp_dropout_uncertainty_with_unknown.csv', index=False)
+    df.to_csv('mnist_results/mlp_dropout_uncertainty_with_unknown.csv', index=False)
     gc.collect()
 
 # Without unknown labels in the training set
 
 try:
-    df = pd.read_csv('mlp_dropout_uncertainty_without_unknown.csv')
+    df = pd.read_csv('mnist_results/mlp_dropout_uncertainty_without_unknown.csv')
 except:
     df = pd.DataFrame()
 
 for experiment, network, dataset, inside_labels, unknown_labels in params:
     out = anomaly(experiment, network, dataset, inside_labels, unknown_labels, with_unknown=False)
     df = df.append(out)
-    df.to_csv('mlp_dropout_uncertainty_without_unknown.csv', index=False)
+    df.to_csv('mnist_results/mlp_dropout_uncertainty_without_unknown.csv', index=False)
     gc.collect()

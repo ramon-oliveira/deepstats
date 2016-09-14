@@ -67,24 +67,24 @@ params = [
 
 
 try:
-    df = pd.read_csv('poor_bayesian_uncertainty_with_unknown.csv')
+    df = pd.read_csv('mnist_results/poor_bayesian_uncertainty_with_unknown.csv')
 except:
     df = pd.DataFrame()
 
 for experiment, network, dataset, inside_labels, unknown_labels in params:
     out = anomaly(experiment, network, dataset, inside_labels, unknown_labels, with_unknown=True)
     df = df.append(out)
-    df.to_csv('poor_bayesian_uncertainty_with_unknown.csv', index=False)
+    df.to_csv('mnist_results/poor_bayesian_uncertainty_with_unknown.csv', index=False)
     gc.collect()
 
 
 try:
-    df = pd.read_csv('poor_bayesian_uncertainty_without_unknown.csv')
+    df = pd.read_csv('mnist_results/poor_bayesian_uncertainty_without_unknown.csv')
 except:
     df = pd.DataFrame()
 
 for experiment, network, dataset, inside_labels, unknown_labels in params:
     out = anomaly(experiment, network, dataset, inside_labels, unknown_labels, with_unknown=False)
     df = df.append(out)
-    df.to_csv('poor_bayesian_uncertainty_without_unknown.csv', index=False)
+    df.to_csv('mnist_results/poor_bayesian_uncertainty_without_unknown.csv', index=False)
     gc.collect()
