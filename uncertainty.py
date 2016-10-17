@@ -3,7 +3,7 @@ import numpy as np
 import dataloader
 from keras.models import Sequential
 from keras.layers import Activation, Dense, Dropout, ELU
-from layers import Bayesian, PoorBayesian, ProbabilisticDropout
+from layers import Bayesian, PoorBayesian, ProbabilisticDropout, BayesianConvolution2D
 from objectives import bayesian_loss
 import time
 import pandas as pd
@@ -30,7 +30,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
             acc_threshold=0.99,
             dropout_p=0.5,
             save_weights=False):
-    assert dataset in ['mnist', 'cifar']
+    assert dataset in ['mnist', 'cifar', 'svhn']
     assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp-deterministic']
     assert len(hidden_layers) >= 1
     assert len(inside_labels) >= 2
@@ -61,6 +61,15 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     model = Sequential()
     if network == 'bayesian':
         model.add(Bayesian(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
+        model.add(ELU())
+        for h in hidden_layers[1:]:
+            model.add(Bayesian(h, mean_prior, std_prior))
+            model.add(ELU())
+        model.add(Bayesian(out_dim, mean_prior, std_prior))
+        model.add(Activation('softmax'))
+        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+    elif network == 'convolution-bayesian':
+        model.add(BayesianConvolution2D(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
         model.add(ELU())
         for h in hidden_layers[1:]:
             model.add(Bayesian(h, mean_prior, std_prior))

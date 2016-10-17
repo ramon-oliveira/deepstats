@@ -1,12 +1,33 @@
 import numpy as np
 from keras.utils import np_utils
 from collections import defaultdict
+import scipy.io
+
+
+class SVHN(object):
+
+    def __init__(self):
+        train = scipy.io.loadmat('/home/roliveira/.keras/datasets/svhn/train_32x32.mat')
+        test = scipy.io.loadmat('/home/roliveira/.keras/datasets/svhn/test_32x32.mat')
+
+        self.X_train = np.moveaxis(train['X'], [0, 1 , 2, 3], [2, 3, 1, 0])
+        self.y_train = train['y'].reshape(-1)
+        self.y_train[self.y_train == 10] = 0
+
+        self.X_test = np.moveaxis(test['X'], [0, 1 , 2, 3], [2, 3, 1, 0])
+        self.y_test = test['y']
+        self.y_test[self.y_test == 10] = 0
+
+    def load_data(self):
+        return (self.X_train, self.y_train), (self.X_test, self.y_test)
 
 def load(dataset, inside_labels, unknown_labels, with_unknown):
     if dataset == 'mnist':
         from keras.datasets import mnist as data
     elif dataset == 'cifar':
         from keras.datasets import cifar10 as data
+    elif dataset == 'svhn':
+        data = SVHN()
 
     inside_labels.sort()
     unknown_labels.sort()
