@@ -11,10 +11,12 @@ class SVHN(object):
         test = scipy.io.loadmat('/home/roliveira/.keras/datasets/svhn/test_32x32.mat')
 
         self.X_train = np.moveaxis(train['X'], [0, 1 , 2, 3], [2, 3, 1, 0])
-        self.y_train = train['y']
+        self.y_train = train['y'].reshape(-1)
+        self.y_train[self.y_train == 10] = 0
 
         self.X_test = np.moveaxis(test['X'], [0, 1 , 2, 3], [2, 3, 1, 0])
         self.y_test = test['y']
+        self.y_test[self.y_test == 10] = 0
 
     def load_data(self):
         return (self.X_train, self.y_train), (self.X_test, self.y_test)
