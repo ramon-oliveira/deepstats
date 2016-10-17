@@ -30,7 +30,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
             acc_threshold=0.99,
             dropout_p=0.5,
             save_weights=False):
-    assert dataset in ['mnist', 'cifar']
+    assert dataset in ['mnist', 'cifar', 'svhn']
     assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp-deterministic']
     assert len(hidden_layers) >= 1
     assert len(inside_labels) >= 2
