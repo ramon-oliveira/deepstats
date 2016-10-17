@@ -16,7 +16,7 @@ class SVHN(object):
         self.X_test = np.moveaxis(test['X'], [0, 1 , 2, 3], [2, 3, 1, 0])
         self.y_test = test['y']
 
-    def load_data():
+    def load_data(self):
         return (self.X_train, self.y_train), (self.X_test, self.y_test)
 
 def load(dataset, inside_labels, unknown_labels, with_unknown):
