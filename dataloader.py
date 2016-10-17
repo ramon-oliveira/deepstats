@@ -7,8 +7,8 @@ import scipy.io
 class SVHN(object):
 
     def __init__(self):
-        train = scipy.io.loadmat('~/.keras/datasets/svhn/train_32x32.mat')
-        test = scipy.io.loadmat('~/.keras/datasets/svhn/test_32x32.mat')
+        train = scipy.io.loadmat('/home/roliveira/.keras/datasets/svhn/train_32x32.mat')
+        test = scipy.io.loadmat('/home/roliveira/.keras/datasets/svhn/test_32x32.mat')
 
         self.X_train = np.moveaxis(train['X'], [0, 1 , 2, 3], [2, 3, 1, 0])
         self.y_train = train['y']
