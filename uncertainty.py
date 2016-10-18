@@ -9,6 +9,64 @@ import time
 import pandas as pd
 from sklearn import metrics
 
+def create_model(network_model, batch_size, in_dim, out_dim, nb_batchs):
+    mean_prior = 0.0
+    std_prior = 0.05
+    model = Sequential()
+    if network_model == 'mlp-bayesian':
+        model.add(Bayesian(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
+        model.add(ELU())
+        for h in hidden_layers[1:]:
+            model.add(Bayesian(h, mean_prior, std_prior))
+            model.add(ELU())
+        model.add(Bayesian(out_dim, mean_prior, std_prior))
+        model.add(Activation('softmax'))
+        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+
+    elif network_model == 'convolutional-poor-bayesian':
+        model.add(BayesianConvolution2D(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
+        model.add(ELU())
+        for h in hidden_layers[1:]:
+            model.add(Bayesian(h, mean_prior, std_prior))
+            model.add(ELU())
+        model.add(Bayesian(out_dim, mean_prior, std_prior))
+        model.add(Activation('softmax'))
+        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+
+    elif network_model == 'poor-bayesian':
+        model.add(PoorBayesian(hidden_layers[0], mean_prior, std_prior, input_shape=[in_dim]))
+        model.add(ELU())
+        for h in hidden_layers[1:]:
+            model.add(PoorBayesian(h, mean_prior, std_prior))
+            model.add(ELU())
+        model.add(PoorBayesian(out_dim, mean_prior, std_prior))
+        model.add(Activation('softmax'))
+        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+
+    elif network_model == 'mlp-dropout':
+        model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
+        model.add(ELU())
+        for h in hidden_layers[1:]:
+            model.add(Dense(h))
+            model.add(ELU())
+            model.add(ProbabilisticDropout(dropout_p))
+        model.add(Dense(out_dim))
+        model.add(Activation('softmax'))
+        loss = 'categorical_crossentropy'
+
+    elif network_model == 'mlp-deterministic':
+        model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
+        model.add(ELU())
+        for h in hidden_layers[1:]:
+            model.add(Dense(h))
+            model.add(ELU())
+            model.add(Dropout(dropout_p))
+        model.add(Dense(out_dim))
+        model.add(Activation('softmax'))
+        loss = 'categorical_crossentropy'
+
+    model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
+
 def model_test(model, batch_size, X_test, y_test, labels_to_test):
     cnt = 0
     acc = 0
@@ -23,101 +81,47 @@ def model_test(model, batch_size, X_test, y_test, labels_to_test):
     return acc/cnt
 
 
-def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, with_unknown,
+def anomaly(experiment_name, network_model, dataset, inside_labels, unknown_labels, with_unknown,
             batch_size=100,
-            max_epochs=100,
+            nb_epochs=100,
             hidden_layers=[512, 512],
             acc_threshold=0.99,
             dropout_p=0.5,
             save_weights=False):
-    assert dataset in ['mnist', 'cifar', 'svhn']
-    assert network in ['poor-bayesian', 'bayesian', 'mlp-dropout', 'mlp-deterministic']
-    assert len(hidden_layers) >= 1
-    assert len(inside_labels) >= 2
 
     print('#'*50)
     print('Experiment:', experiment_name)
-    print('Network:', network)
-    print('Dataset:', dataset)
-    print('Inside Labels:', str(inside_labels))
-    print('Unknown Labels:', str(unknown_labels))
-    print('Batch size:', batch_size)
-    print('Max epochs:', max_epochs)
+    print('model:', network_model)
+    print('dataset:', dataset)
+    print('inside_labels:', str(inside_labels))
+    print('unknown_labels:', str(unknown_labels))
+    print('batch_size:', batch_size)
+    print('nb_epochs:', nb_epochs)
     print('-'*50)
 
     inside_labels.sort()
     unknown_labels.sort()
 
-    (X_train, y_train), (X_test, y_test) = dataloader.load(dataset, inside_labels,
-                                                           unknown_labels, with_unknown)
+    (X_train, y_train), (X_test, y_test) = dataloader.load(dataset,
+                                                           inside_labels,
+                                                           unknown_labels,
+                                                           with_unknown)
 
     in_dim = X_train.shape[1]
     out_dim = y_train.shape[1]
     nb_batchs = X_train.shape[0]//batch_size
 
-    mean_prior = 0.0
-    std_prior = 0.05
 
-    model = Sequential()
-    if network == 'bayesian':
-        model.add(Bayesian(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Bayesian(h, mean_prior, std_prior))
-            model.add(ELU())
-        model.add(Bayesian(out_dim, mean_prior, std_prior))
-        model.add(Activation('softmax'))
-        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
-    elif network == 'convolution-bayesian':
-        model.add(BayesianConvolution2D(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Bayesian(h, mean_prior, std_prior))
-            model.add(ELU())
-        model.add(Bayesian(out_dim, mean_prior, std_prior))
-        model.add(Activation('softmax'))
-        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+    model = create_model(network_model, batch_size, in_dim, out_dim, nb_batchs)
 
-    elif network == 'poor-bayesian':
-        model.add(PoorBayesian(hidden_layers[0], mean_prior, std_prior, input_shape=[in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(PoorBayesian(h, mean_prior, std_prior))
-            model.add(ELU())
-        model.add(PoorBayesian(out_dim, mean_prior, std_prior))
-        model.add(Activation('softmax'))
-        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
-
-    elif network == 'mlp-dropout':
-        model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Dense(h))
-            model.add(ELU())
-            model.add(ProbabilisticDropout(dropout_p))
-        model.add(Dense(out_dim))
-        model.add(Activation('softmax'))
-        loss = 'categorical_crossentropy'
-
-    elif network == 'mlp-deterministic':
-        model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Dense(h))
-            model.add(ELU())
-            model.add(Dropout(dropout_p))
-        model.add(Dense(out_dim))
-        model.add(Activation('softmax'))
-        loss = 'categorical_crossentropy'
-
-    model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
-    mod = X_train.shape[0]%batch_size
-    if mod:
-        X_train = X_train[:-mod]
-        y_train = y_train[:-mod]
+    if network_model.endswith('bayesian') and 'poor' not in network_model:
+        mod = X_train.shape[0]%batch_size
+        if mod:
+            X_train = X_train[:-mod]
+            y_train = y_train[:-mod]
 
     start_time = time.time()
-    model.fit(X_train, y_train, nb_epoch=max_epochs, batch_size=batch_size)
+    model.fit(X_train, y_train, nb_epoch=nb_epochs, batch_size=batch_size)
     end_time = time.time()
 
     if save_weights and with_unknown:
@@ -126,13 +130,12 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
         model.save_weights('weights/'+dataset+'-without-unknown/'+experiment_name+'.h5', overwrite=True)
 
     test_pred_std = {x:[] for x in range(10)}
-    test_entropy_bayesian = {x:[] for x in range(10)}
+    test_entropy = {x:[] for x in range(10)}
 
     cnt_in = 0
     acc_in = 0
-
     for i, (x, y) in enumerate(zip(X_test, y_test)):
-        if network == 'poor-bayesian':
+        if 'poor-bayesian' in network_model:
             probs = model.predict(np.array([x]*batch_size), batch_size=1)
         else:
             probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
@@ -141,7 +144,7 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
         entropy = scipy.stats.entropy(pred_mean)
 
         test_pred_std[y].append(pred_std.mean())
-        test_entropy_bayesian[y].append(entropy)
+        test_entropy[y].append(entropy)
 
         if y in inside_labels:
             o = np.argmax(pred_mean)
@@ -205,10 +208,9 @@ def anomaly(experiment_name, network, dataset, inside_labels, unknown_labels, wi
     df.set_value(experiment_name, "test_acc", acc_in/cnt_in)
     df.set_value(experiment_name, "inside_labels", str(inside_labels))
     df.set_value(experiment_name, "unknown_labels", str(unknown_labels))
-    df.set_value(experiment_name, "epochs", max_epochs)
-    df.set_value(experiment_name, "max_epochs", max_epochs)
-    df = anomaly_detection(test_pred_std, "bayesian_prediction_std_", df)
-    df = anomaly_detection(test_entropy_bayesian, "bayesian_entropy_", df)
+    df.set_value(experiment_name, "epochs", nb_epochs)
+    df = anomaly_detection(test_pred_std, "pred_std_", df)
+    df = anomaly_detection(test_entropy, "entropy_", df)
     return df
 
 #out = anomaly("test", "bayesian", "mnist",  [0, 1, 4, 8], [7, 9], with_unknown = False)
