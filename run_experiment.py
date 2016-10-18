@@ -1,4 +1,5 @@
 import gc
+import os
 import sys
 import argparse
 import pandas as pd
@@ -11,10 +12,8 @@ parser.add_argument('--dataset', dest='dataset', action='store',
                     help='Dataset', required=True)
 
 parser.add_argument('--model', dest='model', action='store',
-                    choices=['mlp-deterministic','mlp-dropout',
-                             'mlp-bayesian', 'mlp-poor-bayesian'
-                             'convolutional', 'convolutional-dropout',
-                             'convolutional-poor-bayesian'],
+                    choices=['mlp','mlp-dropout', 'mlp-poor-bayesian', 'mlp-bayesian',
+                             'convolutional', 'convolutional-dropout', 'convolutional-poor-bayesian'],
                     help='Neural Network', required=True)
 
 args = parser.parse_args(sys.argv[1:])
@@ -42,7 +41,7 @@ labels = [
     [[4, 8, 7, 3], [9, 2]],
 ]
 
-def run(dataset, model, with_unknown):
+def run_experiment(dataset, model, with_unknown):
     results_folder = dataset+'_results'
     filename = model+'_'+('with' if with_unknown else 'out')+'_unknown.csv'
 
@@ -67,5 +66,5 @@ def run(dataset, model, with_unknown):
             gc.collect()
 
 
-run(args['dataset'], args['model'], True)
-run(args['dataset'], args['model'], False)
+run_experiment(args.dataset, args.model, True)
+run_experiment(args.dataset, args.model, False)

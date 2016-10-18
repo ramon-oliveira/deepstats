@@ -2,70 +2,125 @@ import scipy.stats
 import numpy as np
 import dataloader
 from keras.models import Sequential
-from keras.layers import Activation, Dense, Dropout, ELU
-from layers import Bayesian, PoorBayesian, ProbabilisticDropout, BayesianConvolution2D
+from keras.layers import Activation, Dense, Dropout
+from keras.layers import Convolution2D, MaxPooling2D, Flatten
+from layers import Bayesian, PoorBayesian
+from layers import ProbabilisticDropout, PoorBayesianConvolution2D
 from objectives import bayesian_loss
 import time
 import pandas as pd
 from sklearn import metrics
 
-def create_model(network_model, batch_size, in_dim, out_dim, nb_batchs):
+def create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs):
     mean_prior = 0.0
     std_prior = 0.05
     model = Sequential()
+
     if network_model == 'mlp-bayesian':
-        model.add(Bayesian(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Bayesian(h, mean_prior, std_prior))
-            model.add(ELU())
-        model.add(Bayesian(out_dim, mean_prior, std_prior))
+        model.add(Bayesian(512, mean_prior, std_prior, batch_input_shape=[batch_size] + input_shape))
+        model.add(Activation('relu'))
+        model.add(Bayesian(512, mean_prior, std_prior))
+        model.add(Activation('relu'))
+        model.add(Bayesian(nb_classes, mean_prior, std_prior))
         model.add(Activation('softmax'))
         loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
 
-    elif network_model == 'convolutional-poor-bayesian':
-        model.add(BayesianConvolution2D(hidden_layers[0], mean_prior, std_prior, batch_input_shape=[batch_size, in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Bayesian(h, mean_prior, std_prior))
-            model.add(ELU())
-        model.add(Bayesian(out_dim, mean_prior, std_prior))
-        model.add(Activation('softmax'))
-        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
-
-    elif network_model == 'poor-bayesian':
-        model.add(PoorBayesian(hidden_layers[0], mean_prior, std_prior, input_shape=[in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(PoorBayesian(h, mean_prior, std_prior))
-            model.add(ELU())
-        model.add(PoorBayesian(out_dim, mean_prior, std_prior))
+    elif network_model == 'mlp-poor-bayesian':
+        model.add(PoorBayesian(512, mean_prior, std_prior, input_shape=input_shape))
+        model.add(Activation('relu'))
+        model.add(PoorBayesian(512, mean_prior, std_prior))
+        model.add(Activation('relu'))
+        model.add(PoorBayesian(nb_classes, mean_prior, std_prior))
         model.add(Activation('softmax'))
         loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
 
     elif network_model == 'mlp-dropout':
-        model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Dense(h))
-            model.add(ELU())
-            model.add(ProbabilisticDropout(dropout_p))
-        model.add(Dense(out_dim))
+        model.add(Dense(512, input_shape=input_shape))
+        model.add(Activation('relu'))
+        model.add(ProbabilisticDropout(0.5))
+        model.add(Dense(512))
+        model.add(Activation('relu'))
+        model.add(ProbabilisticDropout(0.5))
+        model.add(Dense(nb_classes))
         model.add(Activation('softmax'))
         loss = 'categorical_crossentropy'
 
-    elif network_model == 'mlp-deterministic':
-        model.add(Dense(hidden_layers[0], input_shape=[in_dim]))
-        model.add(ELU())
-        for h in hidden_layers[1:]:
-            model.add(Dense(h))
-            model.add(ELU())
-            model.add(Dropout(dropout_p))
-        model.add(Dense(out_dim))
+    elif network_model == 'mlp':
+        model.add(Dense(512, input_shape=input_shape))
+        model.add(Activation('relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(512))
+        model.add(Activation('relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(nb_classes))
+        model.add(Activation('softmax'))
+        loss = 'categorical_crossentropy'
+
+    elif network_model == 'convolutional-poor-bayesian':
+        model.add(PoorBayesianConvolution2D(32, 3, 3, border_mode='same', input_shape=input_shape))
+        model.add(Activation('relu'))
+        model.add(PoorBayesianConvolution2D(32, 3, 3))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.25))
+        model.add(PoorBayesianConvolution2D(64, 3, 3, border_mode='same'))
+        model.add(Activation('relu'))
+        model.add(PoorBayesianConvolution2D(64, 3, 3))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.25))
+        model.add(Flatten())
+        model.add(PoorBayesian(512))
+        model.add(Activation('relu'))
+        model.add(Dropout(0.5))
+        model.add(PoorBayesian(nb_classes))
+        model.add(Activation('softmax'))
+        loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
+
+    elif network_model == 'convolutional-dropout':
+        model.add(Convolution2D(32, 3, 3, border_mode='same', input_shape=input_shape))
+        model.add(Activation('relu'))
+        model.add(Convolution2D(32, 3, 3))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(ProbabilisticDropout(0.25))
+        model.add(Convolution2D(64, 3, 3, border_mode='same'))
+        model.add(Activation('relu'))
+        model.add(Convolution2D(64, 3, 3))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(ProbabilisticDropout(0.25))
+        model.add(Flatten())
+        model.add(Dense(512))
+        model.add(Activation('relu'))
+        model.add(ProbabilisticDropout(0.5))
+        model.add(Dense(nb_classes))
+        model.add(Activation('softmax'))
+        loss = 'categorical_crossentropy'
+
+    elif network_model == 'convolutional':
+        model.add(Convolution2D(32, 3, 3, border_mode='same', input_shape=input_shape))
+        model.add(Activation('relu'))
+        model.add(Convolution2D(32, 3, 3))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.25))
+        model.add(Convolution2D(64, 3, 3, border_mode='same'))
+        model.add(Activation('relu'))
+        model.add(Convolution2D(64, 3, 3))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.25))
+        model.add(Flatten())
+        model.add(Dense(512))
+        model.add(Activation('relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(nb_classes))
         model.add(Activation('softmax'))
         loss = 'categorical_crossentropy'
 
     model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
+    return model
 
 def model_test(model, batch_size, X_test, y_test, labels_to_test):
     cnt = 0
@@ -81,13 +136,9 @@ def model_test(model, batch_size, X_test, y_test, labels_to_test):
     return acc/cnt
 
 
-def anomaly(experiment_name, network_model, dataset, inside_labels, unknown_labels, with_unknown,
-            batch_size=100,
-            nb_epochs=100,
-            hidden_layers=[512, 512],
-            acc_threshold=0.99,
-            dropout_p=0.5,
-            save_weights=False):
+def anomaly(experiment_name, network_model, dataset,
+            inside_labels, unknown_labels, with_unknown,
+            batch_size=100, nb_epochs=100, save_weights=False):
 
     print('#'*50)
     print('Experiment:', experiment_name)
@@ -107,12 +158,15 @@ def anomaly(experiment_name, network_model, dataset, inside_labels, unknown_labe
                                                            unknown_labels,
                                                            with_unknown)
 
-    in_dim = X_train.shape[1]
-    out_dim = y_train.shape[1]
+    if 'mlp' in network_model:
+        X_train = X_train.reshape(X_train.shape[0], -1)
+        X_test = X_test.reshape(X_test.shape[0], -1)
+
+    input_shape = X_train.shape[1:]
+    nb_classes = y_train.shape[1]
     nb_batchs = X_train.shape[0]//batch_size
 
-
-    model = create_model(network_model, batch_size, in_dim, out_dim, nb_batchs)
+    model = create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs)
 
     if network_model.endswith('bayesian') and 'poor' not in network_model:
         mod = X_train.shape[0]%batch_size

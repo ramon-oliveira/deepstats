@@ -3,7 +3,7 @@ import numpy as np
 import dataloader
 from keras.models import Sequential
 from keras.layers import Activation, Dense, Dropout, ELU, MaxPooling2D, Flatten
-from layers import Bayesian, PoorBayesian, ProbabilisticDropout, BayesianConvolution2D
+from layers import Bayesian, PoorBayesian, ProbabilisticDropout, PoorBayesianConvolution2D
 from objectives import bayesian_loss, explicit_bayesian_loss
 import time
 import pandas as pd
@@ -32,28 +32,26 @@ Y_test = np_utils.to_categorical(y_test, nb_classes)
 
 print(X_train.shape)
 
-
-
 model = Sequential()
-model.add(BayesianConvolution2D(32, 3, 3, mean_prior, std_prior, border_mode='valid',
+model.add(PoorBayesianConvolution2D(mean_prior, std_prior, 32, 3, 3, border_mode='valid',
                                 batch_input_shape=[batch_size] + list(X_train.shape[1:])))
 model.add(ELU())
-model.add(BayesianConvolution2D(32, 3, 3, mean_prior, std_prior))
+model.add(PoorBayesianConvolution2D(mean_prior, std_prior, 32, 3, 3))
 model.add(ELU())
 model.add(MaxPooling2D(pool_size=(2, 2)))
 # model.add(Dropout(0.25))
 
-model.add(BayesianConvolution2D(64, 3, 3, mean_prior, std_prior, border_mode='same'))
+model.add(PoorBayesianConvolution2D(mean_prior, std_prior, 64, 3, 3, border_mode='same'))
 model.add(ELU())
-model.add(BayesianConvolution2D(64, 3, 3, mean_prior, std_prior))
+model.add(PoorBayesianConvolution2D(mean_prior, std_prior, 64, 3, 3))
 model.add(ELU())
 model.add(MaxPooling2D(pool_size=(2, 2)))
 # model.add(Dropout(0.25))
 
 model.add(Flatten())
-model.add(Bayesian(512, mean_prior, std_prior))
+model.add(PoorBayesian(512, mean_prior, std_prior))
 model.add(ELU())
-model.add(Bayesian(nb_classes, mean_prior, std_prior))
+model.add(PoorBayesian(nb_classes, mean_prior, std_prior))
 model.add(Activation('softmax'))
 loss = bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs)
 

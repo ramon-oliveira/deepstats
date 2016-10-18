@@ -24,7 +24,7 @@ class SVHN(object):
 def load(dataset, inside_labels, unknown_labels, with_unknown):
     if dataset == 'mnist':
         from keras.datasets import mnist as data
-    elif dataset == 'cifar':
+    elif dataset == 'cifar10':
         from keras.datasets import cifar10 as data
     elif dataset == 'svhn':
         data = SVHN()
@@ -53,7 +53,8 @@ def load(dataset, inside_labels, unknown_labels, with_unknown):
                 idxs_train += idxs_labels[label]
 
     X_train = X_train[idxs_train]/255
-    X_train = X_train.reshape(X_train.shape[0], -1)
+    if len(X_train.shape[1:]) == 2:
+        X_train = np.expand_dims(X_train, axis=1)
 
     y_train = y_train[idxs_train]
     y_train = y_train.reshape(y_train.shape[0])

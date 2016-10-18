@@ -1,5 +1,5 @@
 import numpy as np
-from layers import Bayesian, PoorBayesian, BayesianConvolution2D
+from layers import Bayesian, PoorBayesian, PoorBayesianConvolution2D
 import keras.backend as K
 from keras import objectives
 
@@ -16,7 +16,7 @@ def bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
         for layer in model.layers:
             if type(layer) is Bayesian or \
                type(layer) is PoorBayesian or \
-               type(layer) is BayesianConvolution2D:
+               type(layer) is PoorBayesianConvolution2D:
                 mean = layer.mean
                 log_std = layer.log_std
                 KL_prior_posterior += K.sum(KL_standard_normal(mean, log_std, prior_log_std))/batch_size
@@ -48,7 +48,7 @@ def explicit_bayesian_loss(model, mean_prior, std_prior, batch_size, nb_batchs):
         for layer in model.layers:
             if type(layer) is Bayesian or \
                type(layer) is PoorBayesian or \
-               type(layer) is BayesianConvolution2D:
+               type(layer) is PoorBayesianConvolution2D:
                 mean = layer.mean
                 log_std = layer.log_std
                 W = layer.W
