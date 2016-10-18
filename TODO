@@ -1,0 +1,11 @@
+Experiments
+  * 100 replicas: deterministic, dropout, bayesian, poor-bayesian
+    * mnist: mlp
+    * svhn: convolutional
+    * cifar10: convolutional
+
+Graficos:
+  * boxplot:
+    * classificação teste
+    * classificação incerteza
+  * ANOVA:
