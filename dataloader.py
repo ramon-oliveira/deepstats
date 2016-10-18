@@ -69,6 +69,8 @@ def load(dataset, inside_labels, unknown_labels, with_unknown):
     y_train[idxs_unknown, :] = np.array([1.0/len(inside_labels)]*len(inside_labels))
 
     X_test = X_test.reshape(X_test.shape[0], -1)/255
+    if len(X_test.shape[1:]) == 2:
+        X_test = np.expand_dims(X_test, axis=1)
     y_test = y_test.reshape(y_test.shape[0])
 
     assert y_train.shape[1] == len(inside_labels)
