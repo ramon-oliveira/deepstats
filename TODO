@@ -1,5 +1,5 @@
 Experiments
-  * 100 replicas: deterministic, dropout, bayesian, poor-bayesian
+  * 20 experimentos, 3 replicas: deterministic, dropout, bayesian, poor-bayesian
     * mnist: mlp
     * svhn: convolutional
     * cifar10: convolutional
