@@ -62,7 +62,7 @@ def run_experiment(dataset, model, with_unknown):
         aux = df[df.inside_labels == str(inside_labels)]
         aux = aux[aux.unknown_labels == str(unknown_labels)]
         if len(aux) == 3:
-            print('Skipping str(inside_labels), str(unknown_labels)')
+            print('Skipping', str(inside_labels), str(unknown_labels))
         for i in range(3 - len(aux)):
             experiment_name = '{}.{}'.format(idx+1, i+1)
             out = anomaly(experiment_name, model, dataset,
