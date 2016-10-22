@@ -52,11 +52,23 @@ def run_experiment(dataset, model, with_unknown):
 
     try:
         df = pd.read_csv(os.path.join(results_folder, filename))
+        print('Loaded file:', os.path.join(results_folder, filename))
     except:
         df = pd.DataFrame()
 
     for idx, (inside_labels, unknown_labels) in enumerate(labels):
-        for i in range(3):
+        inside_labels.sort()
+        unknown_labels.sort()
+        if 'inside_labels' in df.columns:
+            aux = df[df.inside_labels == str(inside_labels)]
+            aux = aux[aux.unknown_labels == str(unknown_labels)]
+            if len(aux) == 3:
+                print('Skipping', str(inside_labels), str(unknown_labels))
+            rep = 3 - len(aux)
+        else:
+            rep = 3
+            
+        for i in range(rep):
             experiment_name = '{}.{}'.format(idx+1, i+1)
             out = anomaly(experiment_name, model, dataset,
                           inside_labels, unknown_labels,
