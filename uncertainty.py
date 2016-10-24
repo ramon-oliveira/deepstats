@@ -1,3 +1,4 @@
+import os
 import scipy.stats
 import numpy as np
 import dataloader
@@ -10,6 +11,8 @@ from objectives import bayesian_loss
 import time
 import pandas as pd
 from sklearn import metrics
+import tqdm
+import pdb
 
 def create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs):
     mean_prior = 0.0
@@ -122,19 +125,6 @@ def create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs):
     model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
     return model
 
-def model_test(model, batch_size, X_test, y_test, labels_to_test):
-    cnt = 0
-    acc = 0
-    for x, y in zip(X_test, y_test):
-        if y in labels_to_test:
-            cnt += 1
-            probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
-            pred_mean = probs.mean(axis=0)
-            o = np.argmax(pred_mean)
-            if o == labels_to_test.index(y):
-                acc += 1
-    return acc/cnt
-
 
 def anomaly(experiment_name, network_model, dataset,
             inside_labels, unknown_labels, with_unknown,
@@ -175,27 +165,38 @@ def anomaly(experiment_name, network_model, dataset,
             y_train = y_train[:-mod]
 
     start_time = time.time()
-    model.fit(X_train, y_train, nb_epoch=nb_epochs, batch_size=batch_size)
+    model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size)
     end_time = time.time()
 
-    if save_weights and with_unknown:
-        model.save_weights('weights/'+dataset+'-with-unknown/'+experiment_name+'.h5', overwrite=True)
-    elif save_weights:
-        model.save_weights('weights/'+dataset+'-without-unknown/'+experiment_name+'.h5', overwrite=True)
+    if save_weights:
+        path = '{0}_results/weights/{1}_{2}/'
+        wu = 'with' if with_unknown else 'without'
+        path = path.format(dataset, network_model, wu)
+        os.makedirs(path, exist_ok=True)
+        model.save_weights(os.path.join(path, experiment_name+'.h5'), overwrite=True)
 
     test_pred_std = {x:[] for x in range(10)}
     test_entropy = {x:[] for x in range(10)}
-
     cnt_in = 0
     acc_in = 0
+
+    pbar = tqdm.tqdm(total=X_test.shape[0])
     for i, (x, y) in enumerate(zip(X_test, y_test)):
         if 'poor-bayesian' in network_model:
             probs = model.predict(np.array([x]*batch_size), batch_size=1)
         else:
             probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
+
+        pdb.set_trace()
         pred_mean = probs.mean(axis=0)
         pred_std = probs.std(axis=0)
-        entropy = scipy.stats.entropy(pred_mean)
+        mean_entropy = scipy.stats.entropy(pred_mean)
+        entropy = scipy.stats.entropy(probs)
+        entropy_mean_row = entropy.mean(axis=0)
+        entropy_std_row = entropy.std(axis=0)
+        entropy_mean_col = entropy.mean(axis=1)
+        entropy_std_col = entropy.std(axis=1)
+        pdb.set_trace()
 
         test_pred_std[y].append(pred_std.mean())
         test_entropy[y].append(entropy)
@@ -206,6 +207,8 @@ def anomaly(experiment_name, network_model, dataset,
             if o == inside_labels.index(y):
                 acc_in += 1
 
+        pbar.update(1)
+    pbar.close()
 
     # Anomaly detection
     # by classical prediction entropy
@@ -257,6 +260,7 @@ def anomaly(experiment_name, network_model, dataset,
 
     print('-'*50)
     df = pd.DataFrame()
+    df.set_value(experiment_name, "experiment_name", experiment_name)
     df.set_value(experiment_name, "train_time", end_time - start_time)
     df.set_value(experiment_name, "dataset", dataset)
     df.set_value(experiment_name, "test_acc", acc_in/cnt_in)
@@ -266,5 +270,3 @@ def anomaly(experiment_name, network_model, dataset,
     df = anomaly_detection(test_pred_std, "pred_std_", df)
     df = anomaly_detection(test_entropy, "entropy_", df)
     return df
-
-#out = anomaly("test", "bayesian", "mnist",  [0, 1, 4, 8], [7, 9], with_unknown = False)
