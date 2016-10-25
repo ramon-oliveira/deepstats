@@ -13,6 +13,7 @@ import pandas as pd
 from sklearn import metrics
 import tqdm
 import pdb
+import pickle as pkl
 
 def create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs):
     mean_prior = 0.0
@@ -165,7 +166,7 @@ def anomaly(experiment_name, network_model, dataset,
             y_train = y_train[:-mod]
 
     start_time = time.time()
-    model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size)
+    model.fit(X_train, y_train, nb_epoch=nb_epoch, batch_size=batch_size)
     end_time = time.time()
 
     if save_weights:
@@ -205,9 +206,8 @@ def anomaly(experiment_name, network_model, dataset,
         entropy_mean_samples = entropy_samples.mean()
         entropy_std_class = entropy_class.std()
         entropy_std_samples = entropy_samples.std()
-        pdb.set_trace()
 
-        measures['pred_std_mean'][y].append(pred_mean)
+        measures['pred_std_mean'][y].append(pred_std_mean)
         measures['mean_entropy'][y].append(mean_entropy)
         measures['entropy_mean_class'][y].append(entropy_mean_class)
         measures['entropy_mean_samples'][y].append(entropy_mean_samples)
@@ -222,6 +222,9 @@ def anomaly(experiment_name, network_model, dataset,
 
         pbar.update(1)
     pbar.close()
+
+    pdb.set_trace()
+    pkl.dump(measures, open('/work/roliveira/measures.pkl', 'wb'))
 
     # Anomaly detection
     # by classical prediction entropy
