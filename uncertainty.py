@@ -207,7 +207,7 @@ def uncertainty_classifier(measures, inside_labels, unknown_labels):
 
 def anomaly(experiment_name, network_model, dataset,
             inside_labels, unknown_labels, with_unknown,
-            batch_size=100, nb_epochs=100, save_weights=False):
+            batch_size=100, nb_epochs=100, save_weights=True):
 
     print('#'*50)
     print('Experiment:', experiment_name)
