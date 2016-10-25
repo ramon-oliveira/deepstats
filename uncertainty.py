@@ -258,7 +258,9 @@ def anomaly(experiment_name, network_model, dataset,
     if 'poor-bayesian' in network_model:
         bs = 1
 
-    measures_train, train_acc = get_measures(X_train, y_train, model, bs, inside_labels)
+    print('Collecting measures of train')
+    measures_train, train_acc = get_measures(X_train, y_train.argmax(axis=1), model, bs, inside_labels)
+    print('Collecting measures of test')
     measures_test, test_acc = get_measures(X_test, y_test, model, bs, inside_labels)
 
     clf = uncertainty_classifier(measures_train, inside_labels, unknown_labels)
@@ -275,9 +277,9 @@ def anomaly(experiment_name, network_model, dataset,
             p = clf.predict_proba([f])[0, 1]
             measures_test['classifier'][l].append(p)
 
-    pdb.set_trace()
-    pkl.dump(measures_train, open('/work/roliveira/cifar10_measures_train_without.pkl', 'wb'))
-    pkl.dump(measures_test, open('/work/roliveira/cifar10_measures_test_without.pkl', 'wb'))
+    # pdb.set_trace()
+    # pkl.dump(measures_train, open('/work/roliveira/cifar10_measures_train_without.pkl', 'wb'))
+    # pkl.dump(measures_test, open('/work/roliveira/cifar10_measures_test_without.pkl', 'wb'))
 
     # Anomaly detection
     # by classical prediction entropy
