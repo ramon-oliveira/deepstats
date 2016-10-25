@@ -62,11 +62,11 @@ def run_experiment(dataset, model, with_unknown):
         if 'inside_labels' in df.columns:
             aux = df[df.inside_labels == str(inside_labels)]
             aux = aux[aux.unknown_labels == str(unknown_labels)]
-            if len(aux) == 3:
+            if len(aux) == 5:
                 print('Skipping', str(inside_labels), str(unknown_labels))
-            rep = 3 - len(aux)
+            rep = 5 - len(aux)
         else:
-            rep = 3
+            rep = 5
             
         for i in range(rep):
             experiment_name = '{}.{}'.format(idx+1, i+1)
