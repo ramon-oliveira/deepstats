@@ -14,6 +14,7 @@ from sklearn import metrics
 import tqdm
 import pdb
 import pickle as pkl
+from sklearn import linear_model
 
 def create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs):
     mean_prior = 0.0
@@ -127,6 +128,86 @@ def create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs):
     return model
 
 
+def get_measures(Xs, ys, model, batch_size, inside_labels):
+    measures = {
+        'pred_std_mean': {x:[] for x in range(10)},
+        'mean_entropy': {x:[] for x in range(10)},
+        'entropy_mean_class': {x:[] for x in range(10)},
+        'entropy_mean_samples': {x:[] for x in range(10)},
+        'entropy_std_class': {x:[] for x in range(10)},
+        'entropy_std_samples': {x:[] for x in range(10)},
+    }
+    cnt_in = 0
+    acc_in = 0
+    pbar = tqdm.tqdm(total=Xs.shape[0])
+    for i, (x, y) in enumerate(zip(Xs, ys)):
+        if 'poor-bayesian' in network_model:
+            probs = model.predict(np.array([x]*batch_size), batch_size=1)
+        else:
+            probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
+
+        pred_mean = probs.mean(axis=0)
+        pred_std_mean = probs.std(axis=0).mean()
+        mean_entropy = scipy.stats.entropy(pred_mean)
+        entropy_class = scipy.stats.entropy(probs)
+        entropy_samples = scipy.stats.entropy(probs.T)
+        entropy_mean_class = entropy_class.mean()
+        entropy_mean_samples = entropy_samples.mean()
+        entropy_std_class = entropy_class.std()
+        entropy_std_samples = entropy_samples.std()
+
+        measures['pred_std_mean'][y].append(pred_std_mean)
+        measures['mean_entropy'][y].append(mean_entropy)
+        measures['entropy_mean_class'][y].append(entropy_mean_class)
+        measures['entropy_mean_samples'][y].append(entropy_mean_samples)
+        measures['entropy_std_class'][y].append(entropy_std_class)
+        measures['entropy_std_samples'][y].append(entropy_std_samples)
+
+        if y in inside_labels:
+            o = np.argmax(pred_mean)
+            cnt_in += 1
+            if o == inside_labels.index(y):
+                acc_in += 1
+
+        pbar.update(1)
+    pbar.close()
+    return measures, acc_in/cnt_in
+
+
+def uncertainty_classifier(measures, inside_labels, unknown_labels):
+    features_vectors = []
+    labels = []
+    for l in range(10):
+        if l in unknown_labels:
+            continue
+        n = len(measures['entropy_std_samples'][l])
+        for i in range(n):
+            f = [
+                measures['mean_entropy'][l][i],
+                measures['pred_std_mean'][l][i],
+                measures['entropy_std_samples'][l][i],
+                measures['entropy_mean_samples'][l][i],
+            ]
+            features_vectors.append(f)
+            labels.append(l in inside_labels)
+
+    features_vectors = np.array(features_vectors, dtype=np.float64)
+    labels = np.array(labels, dtype=np.bool)
+
+    idxs = np.arange(len(features_vectors))
+    np.random.shuffle(idxs)
+    idxs_train = idxs[:int(idxs.shape[0]*0.7)]
+    idxs_test = idxs[int(idxs.shape[0]*0.7):]
+
+    X_train = features_vectors[idxs_train]
+    y_train = labels[idxs_train]
+    X_test = features_vectors[idxs_test]
+    y_test = labels[idxs_test]
+
+    lr = linear_model.LogisticRegressionCV(Cs=100, scoring='roc_auc').fit(X_train, y_train)
+    return lr
+
+
 def anomaly(experiment_name, network_model, dataset,
             inside_labels, unknown_labels, with_unknown,
             batch_size=100, nb_epochs=100, save_weights=False):
@@ -166,7 +247,7 @@ def anomaly(experiment_name, network_model, dataset,
             y_train = y_train[:-mod]
 
     start_time = time.time()
-    model.fit(X_train, y_train, nb_epoch=nb_epoch, batch_size=batch_size)
+    model.fit(X_train, y_train, nb_epoch=nb_epochs, batch_size=batch_size)
     end_time = time.time()
 
     if save_weights:
@@ -176,55 +257,30 @@ def anomaly(experiment_name, network_model, dataset,
         os.makedirs(path, exist_ok=True)
         model.save_weights(os.path.join(path, experiment_name+'.h5'), overwrite=True)
 
+    bs = batch_size
+    if 'poor-bayesian' in network_model:
+        bs = 1
 
-    measures = {
-        'pred_std_mean': {x:[] for x in range(10)},
-        'mean_entropy': {x:[] for x in range(10)},
-        'entropy_mean_class': {x:[] for x in range(10)},
-        'entropy_mean_samples': {x:[] for x in range(10)},
-        'entropy_std_class': {x:[] for x in range(10)},
-        'entropy_std_samples': {x:[] for x in range(10)},
-    }
-    test_pred_std = {x:[] for x in range(10)}
-    test_entropy = {x:[] for x in range(10)}
-    cnt_in = 0
-    acc_in = 0
+    measures_train, train_acc = get_measures(X_train, y_train, model, bs, inside_labels)
+    measures_test, test_acc = get_measures(X_test, y_test, model, bs, inside_labels)
 
-    pbar = tqdm.tqdm(total=X_test.shape[0])
-    for i, (x, y) in enumerate(zip(X_test, y_test)):
-        if 'poor-bayesian' in network_model:
-            probs = model.predict(np.array([x]*batch_size), batch_size=1)
-        else:
-            probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
-
-        pred_mean = probs.mean(axis=0)
-        pred_std_mean = probs.std(axis=0).mean()
-        mean_entropy = scipy.stats.entropy(pred_mean)
-        entropy_class = scipy.stats.entropy(probs)
-        entropy_samples = scipy.stats.entropy(probs.T)
-        entropy_mean_class = entropy_class.mean()
-        entropy_mean_samples = entropy_samples.mean()
-        entropy_std_class = entropy_class.std()
-        entropy_std_samples = entropy_samples.std()
-
-        measures['pred_std_mean'][y].append(pred_std_mean)
-        measures['mean_entropy'][y].append(mean_entropy)
-        measures['entropy_mean_class'][y].append(entropy_mean_class)
-        measures['entropy_mean_samples'][y].append(entropy_mean_samples)
-        measures['entropy_std_class'][y].append(entropy_std_class)
-        measures['entropy_std_samples'][y].append(entropy_std_samples)
-
-        if y in inside_labels:
-            o = np.argmax(pred_mean)
-            cnt_in += 1
-            if o == inside_labels.index(y):
-                acc_in += 1
-
-        pbar.update(1)
-    pbar.close()
+    clf = uncertainty_classifier(measures_train, inside_labels, unknown_labels)
+    measures_test['classifier'] = {l:[] for l in range(10)}
+    for l in range(10):
+        n = len(measures_test['entropy_std_samples'][l])
+        for i in range(n):
+            f = [
+                measures_test['mean_entropy'][l][i],
+                measures_test['pred_std_mean'][l][i],
+                measures_test['entropy_std_samples'][l][i],
+                measures_test['entropy_mean_samples'][l][i],
+            ]
+            p = clf.predict_proba([f])[0, 1]
+            measures_test['classifier'][l].append(p)
 
     pdb.set_trace()
-    pkl.dump(measures, open('/work/roliveira/measures.pkl', 'wb'))
+    pkl.dump(measures_train, open('/work/roliveira/cifar10_measures_train_without.pkl', 'wb'))
+    pkl.dump(measures_test, open('/work/roliveira/cifar10_measures_test_without.pkl', 'wb'))
 
     # Anomaly detection
     # by classical prediction entropy
@@ -263,26 +319,32 @@ def anomaly(experiment_name, network_model, dataset,
 
         auc = metrics.roc_auc_score(trues, scores)
 
-        print("{}\tscore\tthreshold\tTP\tTN".format(metric_name))
         sorted_acc = sorted(acc.items(), key=lambda x: x[1][0], reverse=True)
-        print("\tbalanced_acc\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][0], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
-        df.set_value(experiment_name, metric_name + "_bal_acc", sorted_acc[0][1][0])
+        df.set_value(experiment_name, metric_name + '_bal_acc', sorted_acc[0][1][0])
+        bal_acc = sorted_acc[0][1][0]
 
         sorted_acc = sorted(acc.items(), key=lambda x: x[1][1], reverse=True)
-        print("\tf1_score\t{:.3f}\t{:.3f}\t\t{:.3f}\t{:.3f}".format(sorted_acc[0][1][1], sorted_acc[0][0], sorted_acc[0][1][2], sorted_acc[0][1][3]))
         df.set_value(experiment_name, metric_name + '_f1_score', sorted_acc[0][1][1])
-        df.set_value(experiment_name, metric_name + "_auc", auc)
+        f1_score = sorted_acc[0][1][1]
+        df.set_value(experiment_name, metric_name + '_auc', auc)
+
+        msg = '{0}: (auc, {1:.2f}), (bal_acc, {2:.2f}), (f1_score, {3:.2f})'
+        print(msg.format(metric_name, auc, bal_acc, f1_score))
+
         return df
 
     print('-'*50)
     df = pd.DataFrame()
-    df.set_value(experiment_name, "experiment_name", experiment_name)
-    df.set_value(experiment_name, "train_time", end_time - start_time)
-    df.set_value(experiment_name, "dataset", dataset)
-    df.set_value(experiment_name, "test_acc", acc_in/cnt_in)
-    df.set_value(experiment_name, "inside_labels", str(inside_labels))
-    df.set_value(experiment_name, "unknown_labels", str(unknown_labels))
-    df.set_value(experiment_name, "epochs", nb_epochs)
-    df = anomaly_detection(test_pred_std, "pred_std_", df)
-    df = anomaly_detection(test_entropy, "entropy_", df)
+    df.set_value(experiment_name, 'experiment_name', experiment_name)
+    df.set_value(experiment_name, 'train_time', end_time - start_time)
+    df.set_value(experiment_name, 'dataset', dataset)
+    df.set_value(experiment_name, 'test_acc', acc_in/cnt_in)
+    df.set_value(experiment_name, 'inside_labels', str(inside_labels))
+    df.set_value(experiment_name, 'unknown_labels', str(unknown_labels))
+    df.set_value(experiment_name, 'epochs', nb_epochs)
+    df = anomaly_detection(measures_test['pred_std_mean'], 'pred_std_', df)
+    df = anomaly_detection(measures_test['mean_entropy'], 'entropy_', df)
+    df = anomaly_detection(measures_test['entropy_mean_samples'], 'entropy_expectation_', df)
+    df = anomaly_detection(measures_test['classifier'], 'classifier_', df)
+
     return df
