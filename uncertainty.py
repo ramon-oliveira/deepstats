@@ -177,12 +177,12 @@ def anomaly(experiment_name, network_model, dataset,
 
 
     measures = {
-        'pred_std_mean': x:[] for x in range(10),
-        'mean_entropy': x:[] for x in range(10),
-        'entropy_mean_class': x:[] for x in range(10),
-        'entropy_mean_samples': x:[] for x in range(10),
-        'entropy_std_class': x:[] for x in range(10),
-        'entropy_std_samples': x:[] for x in range(10),
+        'pred_std_mean': {x:[] for x in range(10)},
+        'mean_entropy': {x:[] for x in range(10)},
+        'entropy_mean_class': {x:[] for x in range(10)},
+        'entropy_mean_samples': {x:[] for x in range(10)},
+        'entropy_std_class': {x:[] for x in range(10)},
+        'entropy_std_samples': {x:[] for x in range(10)},
     }
     test_pred_std = {x:[] for x in range(10)}
     test_entropy = {x:[] for x in range(10)}
