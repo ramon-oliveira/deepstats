@@ -175,6 +175,15 @@ def anomaly(experiment_name, network_model, dataset,
         os.makedirs(path, exist_ok=True)
         model.save_weights(os.path.join(path, experiment_name+'.h5'), overwrite=True)
 
+
+    measures = {
+        'pred_std_mean': x:[] for x in range(10),
+        'mean_entropy': x:[] for x in range(10),
+        'entropy_mean_class': x:[] for x in range(10),
+        'entropy_mean_samples': x:[] for x in range(10),
+        'entropy_std_class': x:[] for x in range(10),
+        'entropy_std_samples': x:[] for x in range(10),
+    }
     test_pred_std = {x:[] for x in range(10)}
     test_entropy = {x:[] for x in range(10)}
     cnt_in = 0
@@ -187,19 +196,23 @@ def anomaly(experiment_name, network_model, dataset,
         else:
             probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
 
-        pdb.set_trace()
         pred_mean = probs.mean(axis=0)
-        pred_std = probs.std(axis=0)
+        pred_std_mean = probs.std(axis=0).mean()
         mean_entropy = scipy.stats.entropy(pred_mean)
-        entropy = scipy.stats.entropy(probs)
-        entropy_mean_row = entropy.mean(axis=0)
-        entropy_std_row = entropy.std(axis=0)
-        entropy_mean_col = entropy.mean(axis=1)
-        entropy_std_col = entropy.std(axis=1)
+        entropy_class = scipy.stats.entropy(probs)
+        entropy_samples = scipy.stats.entropy(probs.T)
+        entropy_mean_class = entropy_class.mean()
+        entropy_mean_samples = entropy_samples.mean()
+        entropy_std_class = entropy_class.std()
+        entropy_std_samples = entropy_samples.std()
         pdb.set_trace()
 
-        test_pred_std[y].append(pred_std.mean())
-        test_entropy[y].append(entropy)
+        measures['pred_std_mean'][y].append(pred_mean)
+        measures['mean_entropy'][y].append(mean_entropy)
+        measures['entropy_mean_class'][y].append(entropy_mean_class)
+        measures['entropy_mean_samples'][y].append(entropy_mean_samples)
+        measures['entropy_std_class'][y].append(entropy_std_class)
+        measures['entropy_std_samples'][y].append(entropy_std_samples)
 
         if y in inside_labels:
             o = np.argmax(pred_mean)
