@@ -337,7 +337,7 @@ def anomaly(experiment_name, network_model, dataset,
     df.set_value(experiment_name, 'experiment_name', experiment_name)
     df.set_value(experiment_name, 'train_time', end_time - start_time)
     df.set_value(experiment_name, 'dataset', dataset)
-    df.set_value(experiment_name, 'test_acc', acc_in/cnt_in)
+    df.set_value(experiment_name, 'test_acc', test_acc)
     df.set_value(experiment_name, 'inside_labels', str(inside_labels))
     df.set_value(experiment_name, 'unknown_labels', str(unknown_labels))
     df.set_value(experiment_name, 'epochs', nb_epochs)
