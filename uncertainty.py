@@ -141,10 +141,7 @@ def get_measures(Xs, ys, model, batch_size, inside_labels):
     acc_in = 0
     pbar = tqdm.tqdm(total=Xs.shape[0])
     for i, (x, y) in enumerate(zip(Xs, ys)):
-        if 'poor-bayesian' in network_model:
-            probs = model.predict(np.array([x]*batch_size), batch_size=1)
-        else:
-            probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
+        probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
 
         pred_mean = probs.mean(axis=0)
         pred_std_mean = probs.std(axis=0).mean()
