@@ -175,8 +175,7 @@ def uncertainty_classifier(measures, inside_labels, unknown_labels):
     features_vectors = []
     labels = []
     for l in range(10):
-        if l in unknown_labels:
-            continue
+        if l in unknown_labels: continue
         n = len(measures['entropy_std_samples'][l])
         for i in range(n):
             f = [
@@ -186,20 +185,13 @@ def uncertainty_classifier(measures, inside_labels, unknown_labels):
                 measures['entropy_mean_samples'][l][i],
             ]
             features_vectors.append(f)
-            labels.append(l in inside_labels)
+            labels.append(l not in inside_labels)
 
     features_vectors = np.array(features_vectors, dtype=np.float64)
     labels = np.array(labels, dtype=np.bool)
 
-    idxs = np.arange(len(features_vectors))
-    np.random.shuffle(idxs)
-    idxs_train = idxs[:int(idxs.shape[0]*0.7)]
-    idxs_test = idxs[int(idxs.shape[0]*0.7):]
-
-    X_train = features_vectors[idxs_train]
-    y_train = labels[idxs_train]
-    X_test = features_vectors[idxs_test]
-    y_test = labels[idxs_test]
+    X_train = features_vectors
+    y_train = labels
 
     lr = linear_model.LogisticRegressionCV(Cs=100, scoring='roc_auc').fit(X_train, y_train)
     return lr
@@ -222,10 +214,10 @@ def anomaly(experiment_name, network_model, dataset,
     inside_labels.sort()
     unknown_labels.sort()
 
-    (X_train, y_train), (X_test, y_test) = dataloader.load(dataset,
-                                                           inside_labels,
-                                                           unknown_labels,
-                                                           with_unknown)
+    (X_train_all, y_train_all), (X_train, y_train), (X_test, y_test) = dataloader.load(dataset,
+                                                                                       inside_labels,
+                                                                                       unknown_labels,
+                                                                                       with_unknown)
 
     if 'mlp' in network_model:
         X_train = X_train.reshape(X_train.shape[0], -1)
@@ -243,8 +235,10 @@ def anomaly(experiment_name, network_model, dataset,
             X_train = X_train[:-mod]
             y_train = y_train[:-mod]
 
+    print('Training')
     start_time = time.time()
-    model.fit(X_train, y_train, nb_epoch=nb_epochs, batch_size=batch_size)
+    for i in tqdm.tqdm(list(range(nb_epochs))):
+        model.fit(X_train, y_train, nb_epoch=1, batch_size=batch_size, verbose=0)
     end_time = time.time()
 
     if save_weights:
@@ -259,10 +253,11 @@ def anomaly(experiment_name, network_model, dataset,
         bs = 1
 
     print('Collecting measures of train')
-    measures_train, train_acc = get_measures(X_train, y_train.argmax(axis=1), model, bs, inside_labels)
+    measures_train, train_acc = get_measures(X_train_all, y_train_all, model, bs, inside_labels)
     print('Collecting measures of test')
     measures_test, test_acc = get_measures(X_test, y_test, model, bs, inside_labels)
 
+    print('Classification')
     clf = uncertainty_classifier(measures_train, inside_labels, unknown_labels)
     measures_test['classifier'] = {l:[] for l in range(10)}
     for l in range(10):
@@ -277,9 +272,10 @@ def anomaly(experiment_name, network_model, dataset,
             p = clf.predict_proba([f])[0, 1]
             measures_test['classifier'][l].append(p)
 
-    # pdb.set_trace()
-    # pkl.dump(measures_train, open('/work/roliveira/cifar10_measures_train_without.pkl', 'wb'))
-    # pkl.dump(measures_test, open('/work/roliveira/cifar10_measures_test_without.pkl', 'wb'))
+    swo = 'with' if with_unknown else 'without'
+    fpath = '/work/roliveira/{0}_measures_{1}_{2}.pkl'
+    pkl.dump(measures_train, open(fpath.format(dataset, 'train', swo), 'wb'))
+    pkl.dump(measures_test, open(fpath.format(dataset, 'test', swo), 'wb'))
 
     # Anomaly detection
     # by classical prediction entropy
