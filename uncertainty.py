@@ -220,6 +220,7 @@ def anomaly(experiment_name, network_model, dataset,
                                                                                        with_unknown)
 
     if 'mlp' in network_model:
+        X_train_all = X_train_all.reshape(X_train_all.shape[0], -1)
         X_train = X_train.reshape(X_train.shape[0], -1)
         X_test = X_test.reshape(X_test.shape[0], -1)
 
