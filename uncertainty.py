@@ -132,6 +132,7 @@ def get_measures(Xs, ys, model, batch_size, inside_labels):
     measures = {
         'pred_std_mean': {x:[] for x in range(10)},
         'mean_entropy': {x:[] for x in range(10)},
+        'variation_ratio': {x:[] for x in range(10)},
         'entropy_mean_class': {x:[] for x in range(10)},
         'entropy_mean_samples': {x:[] for x in range(10)},
         'entropy_std_class': {x:[] for x in range(10)},
@@ -150,7 +151,7 @@ def get_measures(Xs, ys, model, batch_size, inside_labels):
     acc_in = 0
     print('Calculating statistics')
     pbar = tqdm.tqdm(total=Xs.shape[0])
-    for i, (probs, y) in enumerate(zip(probs, ys)):
+    for i, (probs, y) in enumerate(zip(all_probs, ys)):
         pred_mean = probs.mean(axis=0)
         pred_std_mean = probs.std(axis=0).mean()
         mean_entropy = scipy.stats.entropy(pred_mean)
@@ -160,9 +161,12 @@ def get_measures(Xs, ys, model, batch_size, inside_labels):
         entropy_mean_samples = entropy_samples.mean()
         entropy_std_class = entropy_class.std()
         entropy_std_samples = entropy_samples.std()
+        fx = np.max(np.unique(probs.argmax(axis=1), return_counts=True)[1])
+        variation_ratio = 1 - fx/batch_size
 
         measures['pred_std_mean'][y].append(pred_std_mean)
         measures['mean_entropy'][y].append(mean_entropy)
+        measures['variation_ratio'][y].append(variation_ratio)
         measures['entropy_mean_class'][y].append(entropy_mean_class)
         measures['entropy_mean_samples'][y].append(entropy_mean_samples)
         measures['entropy_std_class'][y].append(entropy_std_class)
@@ -187,6 +191,7 @@ def uncertainty_classifier(measures, inside_labels, unknown_labels):
         n = len(measures['entropy_std_samples'][l])
         for i in range(n):
             f = [
+                measures['variation_ratio'][l][i],
                 measures['mean_entropy'][l][i],
                 measures['pred_std_mean'][l][i],
                 measures['entropy_std_samples'][l][i],
