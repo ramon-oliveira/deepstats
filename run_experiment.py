@@ -52,7 +52,8 @@ def run_experiment(dataset, model, with_unknown):
         pass
 
     try:
-        df = pd.read_csv(os.path.join(results_folder, filename))
+        df = pd.read_csv(os.path.join(results_folder, filename),
+                         dtype={'experiment_name': str})
         print('Load file:', os.path.join(results_folder, filename))
     except:
         df = pd.DataFrame()
@@ -64,7 +65,8 @@ def run_experiment(dataset, model, with_unknown):
         for i in range(5):
             experiment_name = '{}.{}'.format(idx+1, i+1)
             if 'experiment_name' in df.columns:
-                if np.float64(experiment_name) in np.float64(df.experiment_name.values):
+                if experiment_name in df.experiment_name.values:
+                    print('Skipping experiment', experiment_name)
                     continue
             out = anomaly(experiment_name, model, dataset,
                           inside_labels, unknown_labels,
