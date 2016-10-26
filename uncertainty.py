@@ -274,6 +274,7 @@ def anomaly(experiment_name, network_model, dataset,
         n = len(measures_test['entropy_std_samples'][l])
         for i in range(n):
             f = [
+                measures_test['variation_ratio'][l][i],
                 measures_test['mean_entropy'][l][i],
                 measures_test['pred_std_mean'][l][i],
                 measures_test['entropy_std_samples'][l][i],
