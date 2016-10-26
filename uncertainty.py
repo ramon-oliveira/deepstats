@@ -191,7 +191,7 @@ def uncertainty_classifier(measures, inside_labels, unknown_labels):
         n = len(measures['entropy_std_samples'][l])
         for i in range(n):
             f = [
-                measures['variation_ratio'][l][i],
+                # measures['variation_ratio'][l][i],
                 measures['mean_entropy'][l][i],
                 measures['pred_std_mean'][l][i],
                 measures['entropy_std_samples'][l][i],
@@ -274,7 +274,7 @@ def anomaly(experiment_name, network_model, dataset,
         n = len(measures_test['entropy_std_samples'][l])
         for i in range(n):
             f = [
-                measures_test['variation_ratio'][l][i],
+                # measures_test['variation_ratio'][l][i],
                 measures_test['mean_entropy'][l][i],
                 measures_test['pred_std_mean'][l][i],
                 measures_test['entropy_std_samples'][l][i],
@@ -351,6 +351,7 @@ def anomaly(experiment_name, network_model, dataset,
     df = anomaly_detection(measures_test['pred_std_mean'], 'pred_std_', df)
     df = anomaly_detection(measures_test['mean_entropy'], 'entropy_', df)
     df = anomaly_detection(measures_test['entropy_mean_samples'], 'entropy_expectation_', df)
+    df = anomaly_detection(measures_test['variation_ratio'], 'entropy_expectation_', df)
     df = anomaly_detection(measures_test['classifier'], 'classifier_', df)
 
     return df
