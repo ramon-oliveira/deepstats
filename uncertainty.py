@@ -137,12 +137,20 @@ def get_measures(Xs, ys, model, batch_size, inside_labels):
         'entropy_std_class': {x:[] for x in range(10)},
         'entropy_std_samples': {x:[] for x in range(10)},
     }
+
+    all_probs = []
+    for i in tqdm.tqdm(list(range(batch_size))):
+        probs = model.predict(Xs, batch_size=batch_size)
+        all_probs.append(probs)
+
+    all_probs = np.array(all_probs)
+    all_probs = np.swapaxes(all_probs, 0, 1)
+
     cnt_in = 0
     acc_in = 0
+    print('Calculating statistics')
     pbar = tqdm.tqdm(total=Xs.shape[0])
-    for i, (x, y) in enumerate(zip(Xs, ys)):
-        probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
-
+    for i, (probs, y) in enumerate(zip(probs, ys)):
         pred_mean = probs.mean(axis=0)
         pred_std_mean = probs.std(axis=0).mean()
         mean_entropy = scipy.stats.entropy(pred_mean)
@@ -249,14 +257,10 @@ def anomaly(experiment_name, network_model, dataset,
         os.makedirs(path, exist_ok=True)
         model.save_weights(os.path.join(path, experiment_name+'.h5'), overwrite=True)
 
-    bs = batch_size
-    if 'poor-bayesian' in network_model:
-        bs = 1
-
     print('Collecting measures of train')
-    measures_train, train_acc = get_measures(X_train_all, y_train_all, model, bs, inside_labels)
+    measures_train, train_acc = get_measures(X_train_all, y_train_all, model, batch_size, inside_labels)
     print('Collecting measures of test')
-    measures_test, test_acc = get_measures(X_test, y_test, model, bs, inside_labels)
+    measures_test, test_acc = get_measures(X_test, y_test, model, batch_size, inside_labels)
 
     print('Classification')
     clf = uncertainty_classifier(measures_train, inside_labels, unknown_labels)
