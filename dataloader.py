@@ -36,6 +36,9 @@ def load(dataset, inside_labels, unknown_labels, with_unknown):
     y_train = y_train.reshape(-1)
     y_test = y_test.reshape(-1)
 
+    X_train_all = X_train.copy()
+    y_train_all = y_train.copy()
+
     idxs_labels = defaultdict(list)
     for i, label in enumerate(y_train):
         idxs_labels[label].append(i)
@@ -53,8 +56,10 @@ def load(dataset, inside_labels, unknown_labels, with_unknown):
                 idxs_train += idxs_labels[label]
 
     X_train = X_train[idxs_train]/255
+    X_train_all = X_train_all/255
     if len(X_train.shape[1:]) == 2:
         X_train = np.expand_dims(X_train, axis=1)
+        X_train_all = np.expand_dims(X_train_all, axis=1)
 
     y_train = y_train[idxs_train]
     y_train = y_train.reshape(y_train.shape[0])
@@ -75,4 +80,4 @@ def load(dataset, inside_labels, unknown_labels, with_unknown):
 
     assert y_train.shape[1] == len(inside_labels)
 
-    return (X_train, y_train) , (X_test, y_test)
+    return (X_train_all, y_train_all), (X_train, y_train) , (X_test, y_test),
