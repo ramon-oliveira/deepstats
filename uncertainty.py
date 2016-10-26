@@ -351,7 +351,7 @@ def anomaly(experiment_name, network_model, dataset,
     df = anomaly_detection(measures_test['pred_std_mean'], 'pred_std_', df)
     df = anomaly_detection(measures_test['mean_entropy'], 'entropy_', df)
     df = anomaly_detection(measures_test['entropy_mean_samples'], 'entropy_expectation_', df)
-    df = anomaly_detection(measures_test['variation_ratio'], 'entropy_expectation_', df)
+    df = anomaly_detection(measures_test['variation_ratio'], 'variation_ratio_', df)
     df = anomaly_detection(measures_test['classifier'], 'classifier_', df)
 
     return df
