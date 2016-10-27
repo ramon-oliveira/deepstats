@@ -132,17 +132,26 @@ def get_measures(Xs, ys, model, batch_size, inside_labels):
     measures = {
         'pred_std_mean': {x:[] for x in range(10)},
         'mean_entropy': {x:[] for x in range(10)},
+        'variation_ratio': {x:[] for x in range(10)},
         'entropy_mean_class': {x:[] for x in range(10)},
         'entropy_mean_samples': {x:[] for x in range(10)},
         'entropy_std_class': {x:[] for x in range(10)},
         'entropy_std_samples': {x:[] for x in range(10)},
     }
+
+    all_probs = []
+    for i in tqdm.tqdm(list(range(batch_size))):
+        probs = model.predict(Xs, batch_size=batch_size)
+        all_probs.append(probs)
+
+    all_probs = np.array(all_probs)
+    all_probs = np.swapaxes(all_probs, 0, 1)
+
     cnt_in = 0
     acc_in = 0
+    print('Calculating statistics')
     pbar = tqdm.tqdm(total=Xs.shape[0])
-    for i, (x, y) in enumerate(zip(Xs, ys)):
-        probs = model.predict(np.array([x]*batch_size), batch_size=batch_size)
-
+    for i, (probs, y) in enumerate(zip(all_probs, ys)):
         pred_mean = probs.mean(axis=0)
         pred_std_mean = probs.std(axis=0).mean()
         mean_entropy = scipy.stats.entropy(pred_mean)
@@ -152,9 +161,12 @@ def get_measures(Xs, ys, model, batch_size, inside_labels):
         entropy_mean_samples = entropy_samples.mean()
         entropy_std_class = entropy_class.std()
         entropy_std_samples = entropy_samples.std()
+        fx = np.max(np.unique(probs.argmax(axis=1), return_counts=True)[1])
+        variation_ratio = 1 - fx/batch_size
 
         measures['pred_std_mean'][y].append(pred_std_mean)
         measures['mean_entropy'][y].append(mean_entropy)
+        measures['variation_ratio'][y].append(variation_ratio)
         measures['entropy_mean_class'][y].append(entropy_mean_class)
         measures['entropy_mean_samples'][y].append(entropy_mean_samples)
         measures['entropy_std_class'][y].append(entropy_std_class)
@@ -179,6 +191,7 @@ def uncertainty_classifier(measures, inside_labels, unknown_labels):
         n = len(measures['entropy_std_samples'][l])
         for i in range(n):
             f = [
+                # measures['variation_ratio'][l][i],
                 measures['mean_entropy'][l][i],
                 measures['pred_std_mean'][l][i],
                 measures['entropy_std_samples'][l][i],
@@ -249,14 +262,10 @@ def anomaly(experiment_name, network_model, dataset,
         os.makedirs(path, exist_ok=True)
         model.save_weights(os.path.join(path, experiment_name+'.h5'), overwrite=True)
 
-    bs = batch_size
-    if 'poor-bayesian' in network_model:
-        bs = 1
-
     print('Collecting measures of train')
-    measures_train, train_acc = get_measures(X_train_all, y_train_all, model, bs, inside_labels)
+    measures_train, train_acc = get_measures(X_train_all, y_train_all, model, batch_size, inside_labels)
     print('Collecting measures of test')
-    measures_test, test_acc = get_measures(X_test, y_test, model, bs, inside_labels)
+    measures_test, test_acc = get_measures(X_test, y_test, model, batch_size, inside_labels)
 
     print('Classification')
     clf = uncertainty_classifier(measures_train, inside_labels, unknown_labels)
@@ -265,6 +274,7 @@ def anomaly(experiment_name, network_model, dataset,
         n = len(measures_test['entropy_std_samples'][l])
         for i in range(n):
             f = [
+                # measures_test['variation_ratio'][l][i],
                 measures_test['mean_entropy'][l][i],
                 measures_test['pred_std_mean'][l][i],
                 measures_test['entropy_std_samples'][l][i],
@@ -341,6 +351,7 @@ def anomaly(experiment_name, network_model, dataset,
     df = anomaly_detection(measures_test['pred_std_mean'], 'pred_std_', df)
     df = anomaly_detection(measures_test['mean_entropy'], 'entropy_', df)
     df = anomaly_detection(measures_test['entropy_mean_samples'], 'entropy_expectation_', df)
+    df = anomaly_detection(measures_test['variation_ratio'], 'variation_ratio_', df)
     df = anomaly_detection(measures_test['classifier'], 'classifier_', df)
 
     return df
