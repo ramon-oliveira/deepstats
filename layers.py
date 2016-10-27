@@ -23,7 +23,6 @@ class Bayesian(Layer):
         super(Bayesian, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        print(input_shape)
         input_dim = input_shape[1]
         shape = [input_dim, self.output_dim]
         self.epsilon = K.random_normal([input_shape[0]]+shape, mean=self.mean_prior, std=self.std_prior)
