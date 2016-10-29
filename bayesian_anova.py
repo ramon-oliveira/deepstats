@@ -8,7 +8,7 @@ one_way_code = '''
 data {
     int K; // Number of groups
     int N; // Number of examples per group
-    real y[N, K]; // Observations 
+    real y[N, K]; // Observations
 }
 parameters {
     real mu; // Mean
@@ -26,7 +26,7 @@ model {
     mu ~ normal(0, 10);
     sigma_likelihood ~ uniform(0, 100); // Weak noise std prior
     theta_free ~ normal(0, sigma_theta); // Weak effect prior
-    sigma_theta ~ cauchy(0, 25); 
+    sigma_theta ~ cauchy(0, 25);
     for (i in 1:N)
         for (j in 1:K)
             y[i][j] ~ normal(mu + theta[j], sigma_likelihood);
@@ -61,11 +61,11 @@ model {
     mu_out ~ normal(0, 100); // Weak mean prior
 
     sigma_likelihood ~ uniform(0, 100); // Weak noise std prior (half-normal)
-    
+
     for (i in 1:N)
         for (j in 1:K) {
             // Normal likelihood
-            y_in[i][j] ~ normal(mu_in + theta[j], sigma_likelihood); 
+            y_in[i][j] ~ normal(mu_in + theta[j], sigma_likelihood);
             y_out[i][j] ~ normal(mu_out + theta[j], sigma_likelihood);
         }
 }
@@ -74,37 +74,44 @@ model {
 def show_results(fit):
     print(fit)
     fit.plot()
-    
-def plot_traces(traces, names):
+
+def plot_traces(traces, names, show=True):
     N = len(traces)+1
 
-    plt.figure()
+    fig_1 = plt.figure()
     for (t, n) in zip(traces, names):
-        plt.hist(t, bins = 100, label = n)
+        plt.hist(t, bins=100, label=n)
     plt.legend()
     plt.xlabel("Logit")
-    plt.show()
-    
-    fig = plt.figure(figsize=(4*N, 4))
+    if show:
+        plt.show()
+
+    fig_2 = plt.figure(figsize=(4*N, 4))
     for (t, n, i) in zip(traces, names, range(1, N)):
-        ax = fig.add_subplot(1, N, i)   
+        ax = fig_2.add_subplot(1, N, i)
         pm.plot_posterior(t, varnames=[n], color='#87ceeb', ax = ax)
         ax.set_title(n)
-    plt.show()
+    if show:
+        plt.show()
+    return fig_1, fig_2
 
-def effect_difference(effect1, effect2, name1, name2, CI = 95.0):
+def effect_difference(effect1, effect2, name1, name2, CI=95.0, show=True):
     diff = effect1 - effect2
     label = str(name1) + ' - ' + str(name2)
     plt.figure(figsize=(4,4))
-    plt.hist(diff, bins = 100, label = label)
+    plt.hist(diff, bins=100, label=label)
     plt.legend()
     plt.xlabel("Logit difference")
-    plt.show()
-    plt.figure(figsize=(4,4))
-    ax = plt.gca()
+    if show:
+        plt.show()
+
+    fig = plt.figure(figsize=(4,4))
+    ax = fig.gca()
     pm.plot_posterior(effect1-effect2, varnames=[name1, name2], ref_val = 0, color='#87ceeb', ax = ax)
     ax.set_title(label)
-    plt.show()
+    if show:
+        plt.show()
     low_p = (100.0 - CI)/2.0
     high_p = low_p + CI
     print(label, str(CI) + ' CI:', np.percentile(diff, low_p), np.percentile(diff, high_p), 'Pr > 0:', (diff > 0).mean())
+    return fig
