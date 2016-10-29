@@ -9,6 +9,8 @@ from keras.engine import InputSpec
 from keras.layers import Convolution2D
 from keras.utils.np_utils import conv_output_length, conv_input_length
 
+import pdb
+
 
 class Bayesian(Layer):
 
@@ -33,7 +35,7 @@ class Bayesian(Layer):
         self.trainable_weights = [self.mean, self.log_std, self.bias]
 
     def call(self, x, mask=None):
-        return K.batch_dot(x, self.W) + self.bias
+        return K.squeeze(K.batch_dot(K.expand_dims(x, dim=1), self.W), axis=1) + self.bias
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.output_dim)

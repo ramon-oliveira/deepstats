@@ -22,7 +22,8 @@ def create_model(network_model, batch_size, input_shape, nb_classes, nb_batchs):
     model = Sequential()
 
     if network_model == 'mlp-bayesian':
-        model.add(Bayesian(512, mean_prior, std_prior, batch_input_shape=[batch_size] + input_shape))
+        in_shape = [batch_size] + list(input_shape)
+        model.add(Bayesian(512, mean_prior, std_prior, batch_input_shape=in_shape))
         model.add(Activation('relu'))
         model.add(Bayesian(512, mean_prior, std_prior))
         model.add(Activation('relu'))
