@@ -2,6 +2,7 @@ import numpy as np
 import scipy
 import pymc3 as pm
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 import seaborn as sns
 
 one_way_code = '''
@@ -76,41 +77,43 @@ def show_results(fit):
     fit.plot()
 
 def plot_traces(traces, names, show=True):
-    N = len(traces)+1
 
     fig_1 = plt.figure()
+    plt.locator_params(nbins=4)
     for (t, n) in zip(traces, names):
         plt.hist(t, bins=100, label=n)
     plt.legend()
-    plt.xlabel("Logit")
-    if show:
-        plt.show()
+    if show: plt.show()
 
-    fig_2 = plt.figure(figsize=(4*N, 4))
+    N = len(traces) + 1
+    fig_2 = plt.figure(figsize=(4*N, 3))
     for (t, n, i) in zip(traces, names, range(1, N)):
         ax = fig_2.add_subplot(1, N, i)
-        pm.plot_posterior(t, varnames=[n], color='#87ceeb', ax = ax)
+        pm.plot_posterior(t, varnames=[n], color='#87ceeb', ax=ax)
         ax.set_title(n)
-    if show:
-        plt.show()
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        ax.locator_params(axis='x', nbins=4)
+        ax.locator_params(axis='y', nbins=1)
+    if show: plt.show()
+
     return fig_1, fig_2
 
 def effect_difference(effect1, effect2, name1, name2, CI=95.0, show=True):
     diff = effect1 - effect2
     label = str(name1) + ' - ' + str(name2)
-    plt.figure(figsize=(4,4))
+    plt.figure(figsize=(4, 3))
+    plt.locator_params(nbins=4)
     plt.hist(diff, bins=100, label=label)
     plt.legend()
-    plt.xlabel("Logit difference")
-    if show:
-        plt.show()
+    if show: plt.show()
 
-    fig = plt.figure(figsize=(4,4))
+    fig = plt.figure(figsize=(3, 3))
+    plt.locator_params(nbins=4)
     ax = fig.gca()
     pm.plot_posterior(effect1-effect2, varnames=[name1, name2], ref_val = 0, color='#87ceeb', ax = ax)
     ax.set_title(label)
-    if show:
-        plt.show()
+    if show: plt.show()
+
     low_p = (100.0 - CI)/2.0
     high_p = low_p + CI
     print(label, str(CI) + ' CI:', np.percentile(diff, low_p), np.percentile(diff, high_p), 'Pr > 0:', (diff > 0).mean())
