@@ -106,17 +106,15 @@ fit = model.sampling(data=data, iter=10000, chains=4, thin=5)
 
 bayesian_anova.show_results(fit)
 
-
-
 trace = fit.extract()
-deterministic = trace['theta'][:,0]
-dropout = trace['theta'][:,1]
-poor_bayesian = trace['theta'][:,2]
-in_mean = trace['mu_in']
-out_mean = trace['mu_out']
+deterministic =  scipy.special.expit(trace['theta'][:,0])
+dropout = scipy.special.expit(trace['theta'][:,1])
+poor_bayesian = scipy.special.expit(trace['theta'][:,2])
+in_mean = scipy.special.expit(trace['mu_in'])
+out_mean = scipy.special.expit(trace['mu_out'])
 
-traces = [in_mean, out_mean, deterministic, dropout, poor_bayesian]
-traces_name = ['InOutUnk Mean', 'InOut Mean', 'ML effect', 'Dropout effect', 'OneSample effect']
+traces = [out_mean, in_mean, deterministic, dropout, poor_bayesian]
+traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'Dropout effect', 'OneSample effect']
 fig_hist, fig_effects = bayesian_anova.plot_traces(traces, traces_name, show=False)
 
 fig_hist.savefig(dataset+'_results/images/hist.png')
@@ -125,49 +123,9 @@ fig_effects.savefig(dataset+'_results/images/effects.png')
 fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'Dropout', 'ML', show=False)
 fig_diff_os_ml = bayesian_anova.effect_difference(poor_bayesian, deterministic, 'OneSample', 'ML', show=False)
 fig_diff_os_drop = bayesian_anova.effect_difference(poor_bayesian, dropout, 'OneSample', 'Dropout', show=False)
-fig_diff_iou_io = bayesian_anova.effect_difference(in_mean, out_mean, 'InOutUnk', 'InOut', show=False)
+fig_diff_iou_io = bayesian_anova.effect_difference(in_mean, out_mean, 'Callibrated', 'Blind', show=False)
 
 fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.png')
 fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.png')
 fig_diff_os_drop.savefig(dataset+'_results/images/diff_os_drop.png')
 fig_diff_iou_io.savefig(dataset+'_results/images/diff_iou_io.png')
-
-
-# for y in [y_in, y_out]:
-#     (N, K) = y.shape
-#
-#     data = {'K': K, 'N': N, 'y': y}
-#     fit = model.sampling(data=data, iter=10000, chains=4, thin=5)
-#
-#     # bayesian_anova.show_results(fit)
-#
-#     trace = fit.extract()
-#     base_mean = trace['mu']
-#     deterministic = trace['theta'][:,0]
-#     dropout = trace['theta'][:,1]
-#     poor_bayesian = trace['theta'][:,2]
-#
-#     if y is y_in:
-#         fname = 'with'
-#         in_mean = np.copy(base_mean)
-#     else:
-#         fname = 'without'
-#         out_mean = np.copy(base_mean)
-#
-#     traces = [base_mean, deterministic, dropout, poor_bayesian]
-#     traces_name = ['Base', 'Deterministic effect', 'Dropout effect', 'OneSample Bayesian effect']
-#     fig_1, fig_2 = bayesian_anova.plot_traces(traces, traces_name, show=False)
-#
-#     fig_1.savefig(dataset+'_results/hist_'+fname+'.png')
-#     fig_2.savefig(dataset+'_results/effects_'+fname+'.png')
-#
-#     diff_drop_det = bayesian_anova.effect_difference(dropout, deterministic, 'Dropout', 'Deterministic', show=False)
-#     diff_poor_det = bayesian_anova.effect_difference(poor_bayesian, deterministic, 'OneSample Bayesian', 'Deterministic', show=False)
-#     diff_poor_drop = bayesian_anova.effect_difference(poor_bayesian, dropout, 'OneSample Bayesian', 'Dropout', show=False)
-#
-#     diff_drop_det.savefig(dataset+'_results/diff_drop_det_'+fname+'.png')
-#     diff_poor_det.savefig(dataset+'_results/diff_poor_det_'+fname+'.png')
-#     diff_poor_drop.savefig(dataset+'_results/diff_poor_drop_'+fname+'.png')
-#
-# diff_in_out = bayesian_anova.effect_difference(in_mean, out_mean, 'In', 'Out', show=False)
-# diff_in_out.savefig(dataset+'_results/diff_in_out_'+fname+'.png')
