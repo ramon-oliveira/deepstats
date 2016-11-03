@@ -1,64 +1,59 @@
-# Classification uncertainty using Bayesian neural networks
+# Known Unknowns: Uncertainty Quality in Bayesian Neural Networks
 
-We are using Bayesian neural networks for class anomaly detection. For example, say you have a network that classifies cats and dogs. If you put the image of an ostrich as input, shouldn't the network give some kind of hint that it doesn't understand ostriches? We are testing whether Bayesian neural networks can accomplish that via uncertainty information.
+This repository holds the code for the paper "Known Unknowns: Uncertainty Quality in Bayesian Neural Networks" submited to Bayesian Deep Learning NIPS Workshop.
 
-We are trying out two Bayesian approaches:
-* Yarin Gal's dropout approximation - see [Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning](http://arxiv.org/abs/1506.02142)
-* Variational approximation using normal posteriors - see [Weight Uncertainties in Neural Networks](http://arxiv.org/abs/1505.05424)
+Here we analyse the quality of uncertainty information provided by different Bayesian neural networks when contrasted standard deep learning models. We also propose a novel Bayesian approach for neural networks, similar to the variational approximation of Blundell et al., but much cheaper. We sample the weights only once per training mini-batch, leading to the same expected gradient, and trading off higher variance for computational efficiency (about 10 times faster with a mini-batch of 100). We call that approach One-Sample Bayesian Approximation (OSBA), and investigate whether it achieves better quality of uncertainty information than traditional maximum likelihood models. Techniques like Bayesian-Dropout and OSBA indeed provide better uncertainty information in a well-controlled dataset and deserve further investigation in more contexts. A challenge seems to be an adequate measure of uncertainty for uncontrolled datasets.
 
-In the future we may work with HMC approaches for a complete Bayesian inference.
+## Reproducing results (Python 3.5)
 
-The class anomalies are detected using (marginalized) entropy and prediction variance thresholds. The thresholds are found in a supervised manner.
+### Installing dependences
+```python
+pip install -r requirements.txt
+```
 
-## Dependencies
-* Keras
-* Scientific stack: Pandas, Numpy, Scipy, Scikit-learn
+### Running an experiment
 
-## MNIST
+```python
+python run_experiment.py --dataset=mnist --model=mlp-dropout
+```
 
-#### Standard deviation
-|  Model       | Balanced accuracy | F1-score |
-|--------------|--------------|--------------|
-| Bayesian NN B| 0.927 | 0.929|
-| Bayesian NN  | **0.937** | **0.937** |
-| MLP dropout  | 0.921 | 0.923 |
+Available dataset options:
+* mnist
+* cifar10
+* svhn
 
-#### Entropy
-|  Model       | Balanced accuracy | F1-score |
-|--------------|--------------|--------------|
-| Bayesian NN B| 0.927 | 0.929|
-| Bayesian NN  | **0.937** | **0.937** |
-| MLP dropout  | 0.922 | 0.924 |
-| MLP deterministic  | 0.906 | 0.908 |
-
-#### Variation ratio
-|  Model       | Balanced accuracy | F1-score |
-|--------------|--------------|--------------|
-| Bayesian NN B| 0.927 | 0.929|
-| Bayesian NN  | **0.936** | **0.936** |
-| MLP dropout  | 0.671 | 0.752 |
+Available model options:
+* mlp
+* mlp-dropout
+* mlp-poor-bayesian
+* mlp-bayesian
+* convolutional
+* convolutional-dropout
+* convolutional-poor-bayesian
 
 
-## CIFAR10
+### Plotting results
 
-#### Standard deviation
-|  Model       | Balanced accuracy | F1-score |
-|--------------|--------------|--------------|
-| Bayesian NN B|  |  |
-| Bayesian NN  |  |  |
-| MLP dropout  | 0.647 | 0.667 |
+```python
+python plots_anova.py --dataset=mnist
+```
 
-#### Entropy
-|  Model       | Balanced accuracy | F1-score |
-|--------------|--------------|--------------|
-| Bayesian NN B|  |  |
-| Bayesian NN  |  |  |
-| MLP dropout  | **0.661** | **0.670** |
-| MLP deterministic  | 0.651 | 0.668 |
+## ANOVA Results
 
-#### Variation ratio
-|  Model       | Balanced accuracy | F1-score |
-|--------------|--------------|--------------|
-| Bayesian NN B|  |  |
-| Bayesian NN  |  |  |
-| MLP dropout  | 0.604 | 0.667 |
+### MNIST
+
+![Effects](mnist_results/images/effects.png "Effects")
+
+<img src="mnist_results/images/diff_iou_io.png" alt="Dropout - ML" width="24%"/>
+<img src="mnist_results/images/diff_drop_ml.png" alt="Dropout - ML" width="24%"/>
+<img src="mnist_results/images/diff_os_ml.png" alt="Dropout - ML" width="24%"/>
+<img src="mnist_results/images/diff_os_drop.png" alt="Dropout - ML" width="24%"/>
+
+### CIFAR10
+
+![Effects](mnist_results/images/effects.png "Effects")
+
+<img src="cifar10_results/images/diff_iou_io.png" alt="Dropout - ML" width="24%"/>
+<img src="cifar10_results/images/diff_drop_ml.png" alt="Dropout - ML" width="24%"/>
+<img src="cifar10_results/images/diff_os_ml.png" alt="Dropout - ML" width="24%"/>
+<img src="cifar10_results/images/diff_os_drop.png" alt="Dropout - ML" width="24%"/>
