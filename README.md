@@ -7,13 +7,13 @@ Here we analyse the quality of uncertainty information provided by different Bay
 ## Reproducing results (Python 3.5)
 
 ### Installing dependences
-```python
+```bash
 pip install -r requirements.txt
 ```
 
 ### Running an experiment
 
-```python
+```bash
 python run_experiment.py --dataset=mnist --model=mlp-dropout
 ```
 
@@ -34,7 +34,7 @@ Available model options:
 
 ### Plotting results
 
-```python
+```bash
 python plots_anova.py --dataset=mnist
 ```
 
