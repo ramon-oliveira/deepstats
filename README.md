@@ -49,9 +49,9 @@ python plots_anova.py --dataset=mnist
 <img src="mnist_results/images/diff_os_ml.png" alt="Dropout - ML" width="24%"/>
 <img src="mnist_results/images/diff_os_drop.png" alt="Dropout - ML" width="24%"/>
 
-### CIFAR10
+### CIFAR10 (Updated Results)
 
-![Effects](mnist_results/images/effects.png "Effects")
+![Effects](cifar10_results/images/effects.png "Effects")
 
 <img src="cifar10_results/images/diff_iou_io.png" alt="Dropout - ML" width="24%"/>
 <img src="cifar10_results/images/diff_drop_ml.png" alt="Dropout - ML" width="24%"/>
