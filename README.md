@@ -20,7 +20,7 @@ python run_experiment.py --dataset=mnist --model=mlp-dropout
 Available dataset options:
 * mnist
 * cifar10
-* svhn
+* svhn (experimental)
 
 Available model options:
 * mlp
