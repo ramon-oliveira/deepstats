@@ -284,11 +284,6 @@ def anomaly(experiment_name, network_model, dataset,
             p = clf.predict_proba([f])[0, 1]
             measures_test['classifier'][l].append(p)
 
-    swo = 'with' if with_unknown else 'without'
-    fpath = '/work/roliveira/{0}_measures_{1}_{2}.pkl'
-    pkl.dump(measures_train, open(fpath.format(dataset, 'train', swo), 'wb'))
-    pkl.dump(measures_test, open(fpath.format(dataset, 'test', swo), 'wb'))
-
     # Anomaly detection
     # by classical prediction entropy
     def anomaly_detection(anomaly_score_dict, metric_name, df):
