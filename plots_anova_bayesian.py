@@ -20,7 +20,7 @@ dataset = args.dataset
 
 if dataset == 'mnist':
     nn_model = 'mlp'
-    experiments = ['mlp', 'mlp-dropout', 'mlp-poor-bayesian']#, 'mlp-bayesian']
+    experiments = ['mlp', 'mlp-dropout', 'mlp-poor-bayesian', 'mlp-bayesian']
 else:
     nn_model = 'convolutional'
     experiments = ['convolutional', 'convolutional-dropout', 'convolutional-poor-bayesian']
@@ -87,13 +87,15 @@ model = pystan.StanModel(model_code=bayesian_anova.one_way_code)
 
 out_acc = [nn_model+'_out_classifier_auc',
            nn_model+'-dropout_out_classifier_auc',
-           nn_model+'-poor-bayesian_out_classifier_auc']
+           nn_model+'-poor-bayesian_out_classifier_auc',
+           nn_model+'-bayesian_out_classifier_auc']
 y_out = final_results[out_acc].values
 y_out = scipy.special.logit(y_out)
 
 in_acc = [nn_model+'_in_classifier_auc',
           nn_model+'-dropout_in_classifier_auc',
-          nn_model+'-poor-bayesian_in_classifier_auc']
+          nn_model+'-poor-bayesian_in_classifier_auc',
+          nn_model+'-bayesian_in_classifier_auc']
 y_in = final_results[in_acc].values
 y_in = scipy.special.logit(y_in)
 
@@ -110,23 +112,33 @@ trace = fit.extract()
 deterministic =  scipy.special.expit(trace['theta'][:,0])
 dropout = scipy.special.expit(trace['theta'][:,1])
 poor_bayesian = scipy.special.expit(trace['theta'][:,2])
+bayesian = scipy.special.expit(trace['theta'][:,3])
 in_mean = scipy.special.expit(trace['mu_in'])
 out_mean = scipy.special.expit(trace['mu_out'])
 
-traces = [out_mean, in_mean, deterministic, dropout, poor_bayesian]
-traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'Dropout effect', 'OneSample effect']
+traces = [out_mean, in_mean, deterministic, dropout, poor_bayesian, bayesian]
+traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'Dropout effect', 'OneSample effect', 'Bayesian effect']
 fig_hist, figs_effects = bayesian_anova.plot_traces(traces, traces_name, show=False)
 
+# fig_hist.savefig(dataset+'_results/images/hist.pdf')
+# fig_effects.savefig(dataset+'_results/images/effects.pdf')
 fig_hist.savefig(dataset+'_results/images/hist.svg')
 for name, fig in figs_effects:
-    fig.savefig(dataset+'_results/images/'+name+'_effects.svg')
+    fig.savefig(dataset+'_results/images/'+name+'.svg')
+
 
 fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'Dropout', 'ML', show=False)
 fig_diff_os_ml = bayesian_anova.effect_difference(poor_bayesian, deterministic, 'OneSample', 'ML', show=False)
+fig_diff_bayesian_ml = bayesian_anova.effect_difference(bayesian, deterministic, 'Bayesian', 'ML', show=False)
 fig_diff_os_drop = bayesian_anova.effect_difference(poor_bayesian, dropout, 'OneSample', 'Dropout', show=False)
+fig_diff_os_bayes = bayesian_anova.effect_difference(poor_bayesian, bayesian, 'OneSample', 'Bayesian', show=False)
+fig_diff_drop_bayes = bayesian_anova.effect_difference(dropout, bayesian, 'Dropout', 'Bayesian', show=False)
 fig_diff_iou_io = bayesian_anova.effect_difference(in_mean, out_mean, 'Callibrated', 'Blind', show=False)
 
-fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.svg')
-fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.svg')
-fig_diff_os_drop.savefig(dataset+'_results/images/diff_os_drop.svg')
-fig_diff_iou_io.savefig(dataset+'_results/images/diff_iou_io.svg')
+fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.pdf')
+fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.pdf')
+fig_diff_bayesian_ml.savefig(dataset+'_results/images/diff_bayesian_ml.pdf')
+fig_diff_os_drop.savefig(dataset+'_results/images/diff_os_drop.pdf')
+fig_diff_os_bayes.savefig(dataset+'_results/images/diff_os_bayes.pdf')
+fig_diff_drop_bayes.savefig(dataset+'_results/images/diff_drop_bayes.pdf')
+fig_diff_iou_io.savefig(dataset+'_results/images/diff_iou_io.pdf')

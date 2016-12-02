@@ -86,17 +86,21 @@ def plot_traces(traces, names, show=True):
     if show: plt.show()
 
     N = len(traces) + 1
-    fig_2 = plt.figure(figsize=(4*N, 3))
+    figs = []
     for (t, n, i) in zip(traces, names, range(1, N)):
-        ax = fig_2.add_subplot(1, N, i)
+        fig = plt.figure(figsize=(3, 3))
+        plt.locator_params(nbins=4)
+        ax = fig.gca()
+        # ax = fig_2.add_subplot(1, N, i)
         pm.plot_posterior(t, varnames=[n], color='#87ceeb', ax=ax)
         ax.set_title(n)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         ax.locator_params(axis='x', nbins=4)
         ax.locator_params(axis='y', nbins=1)
+        figs.append((n, fig))
     if show: plt.show()
 
-    return fig_1, fig_2
+    return fig_1, figs
 
 def effect_difference(effect1, effect2, name1, name2, CI=95.0, show=True):
     diff = effect1 - effect2
