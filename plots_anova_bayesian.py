@@ -122,9 +122,10 @@ fig_hist, figs_effects = bayesian_anova.plot_traces(traces, traces_name, show=Fa
 
 # fig_hist.savefig(dataset+'_results/images/hist.pdf')
 # fig_effects.savefig(dataset+'_results/images/effects.pdf')
-fig_hist.savefig(dataset+'_results/images/hist.svg')
+fig_hist.savefig(dataset+'_results/images/hist.pdf')
 for name, fig in figs_effects:
-    fig.savefig(dataset+'_results/images/'+name+'.svg')
+    name = name.lower().replace(' ', '_')
+    fig.savefig(dataset+'_results/images/'+name+'.pdf')
 
 
 fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'Dropout', 'ML', show=False)

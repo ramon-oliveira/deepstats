@@ -117,16 +117,17 @@ traces = [out_mean, in_mean, deterministic, dropout, poor_bayesian]
 traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'Dropout effect', 'OneSample effect']
 fig_hist, figs_effects = bayesian_anova.plot_traces(traces, traces_name, show=False)
 
-fig_hist.savefig(dataset+'_results/images/hist.svg')
+fig_hist.savefig(dataset+'_results/images/hist.pdf')
 for name, fig in figs_effects:
-    fig.savefig(dataset+'_results/images/'+name+'_effects.svg')
+    name = name.lower().replace(' ', '_')
+    fig.savefig(dataset+'_results/images/'+name+'.pdf')
 
 fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'Dropout', 'ML', show=False)
 fig_diff_os_ml = bayesian_anova.effect_difference(poor_bayesian, deterministic, 'OneSample', 'ML', show=False)
 fig_diff_os_drop = bayesian_anova.effect_difference(poor_bayesian, dropout, 'OneSample', 'Dropout', show=False)
 fig_diff_iou_io = bayesian_anova.effect_difference(in_mean, out_mean, 'Callibrated', 'Blind', show=False)
 
-fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.svg')
-fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.svg')
-fig_diff_os_drop.savefig(dataset+'_results/images/diff_os_drop.svg')
-fig_diff_iou_io.savefig(dataset+'_results/images/diff_iou_io.svg')
+fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.pdf')
+fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.pdf')
+fig_diff_os_drop.savefig(dataset+'_results/images/diff_os_drop.pdf')
+fig_diff_iou_io.savefig(dataset+'_results/images/diff_iou_io.pdf')
