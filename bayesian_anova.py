@@ -24,10 +24,11 @@ transformed parameters {
   theta[K] <- -sum(theta_free);
 }
 model {
+    // Weakly informative priors
     mu ~ normal(0, 10);
-    sigma_likelihood ~ uniform(0, 100); // Weak noise std prior
-    theta_free ~ normal(0, sigma_theta); // Weak effect prior
-    sigma_theta ~ cauchy(0, 25);
+    sigma_likelihood ~ cauchy(0, 10);
+    theta_free ~ normal(0, sigma_theta);
+    sigma_theta ~ cauchy(0, 10);
     for (i in 1:N)
         for (j in 1:K)
             y[i][j] ~ normal(mu + theta[j], sigma_likelihood);
@@ -55,13 +56,12 @@ transformed parameters {
   theta[K] <- -sum(theta_free);
 }
 model {
-    theta_free ~ normal(0, sigma_theta); // Weak effect prior
-    sigma_theta ~ cauchy(0, 25);
-
-    mu_in ~ normal(0, 10); // Weak mean prior
-    mu_out ~ normal(0, 10); // Weak mean prior
-
-    sigma_likelihood ~ uniform(0, 100); // Weak noise std prior (half-normal)
+    // Weakly informative priors
+    theta_free ~ normal(0, sigma_theta); 
+    sigma_theta ~ cauchy(0, 10);
+    mu_in ~ normal(0, 10);
+    mu_out ~ normal(0, 10);
+    sigma_likelihood ~ cauchy(0, 10);
 
     for (i in 1:N)
         for (j in 1:K) {
