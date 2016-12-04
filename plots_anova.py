@@ -102,7 +102,7 @@ model = pystan.StanModel(model_code=bayesian_anova.two_way_code)
 
 N, K = y_out.shape
 data = {'K': K, 'N': N, 'y_in': y_in, 'y_out': y_out}
-fit = model.sampling(data=data, iter=10000, chains=4, thin=5)
+fit = model.sampling(data=data, iter=100000, warmup = 10000, chains=4, thin=5)
 
 bayesian_anova.show_results(fit)
 
@@ -114,7 +114,7 @@ in_mean = scipy.special.expit(trace['mu_in'])
 out_mean = scipy.special.expit(trace['mu_out'])
 
 traces = [out_mean, in_mean, deterministic, dropout, poor_bayesian]
-traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'Dropout effect', 'OneSample effect']
+traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'BD effect', 'OSBA effect']
 fig_hist, figs_effects = bayesian_anova.plot_traces(traces, traces_name, show=False)
 
 fig_hist.savefig(dataset+'_results/images/hist.pdf')
@@ -122,10 +122,10 @@ for name, fig in figs_effects:
     name = name.lower().replace(' ', '_')
     fig.savefig(dataset+'_results/images/'+name+'.pdf')
 
-fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'Dropout', 'ML', show=False)
-fig_diff_os_ml = bayesian_anova.effect_difference(poor_bayesian, deterministic, 'OneSample', 'ML', show=False)
-fig_diff_os_drop = bayesian_anova.effect_difference(poor_bayesian, dropout, 'OneSample', 'Dropout', show=False)
-fig_diff_iou_io = bayesian_anova.effect_difference(in_mean, out_mean, 'Callibrated', 'Blind', show=False)
+fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'BD', 'ML', show=False)
+fig_diff_os_ml = bayesian_anova.effect_difference(poor_bayesian, deterministic, 'OSBA', 'ML', show=False)
+fig_diff_os_drop = bayesian_anova.effect_difference(poor_bayesian, dropout, 'OSBA', 'BD', show=False)
+fig_diff_iou_io = bayesian_anova.effect_difference(in_mean, out_mean, 'Calibrated', 'Blind', show=False)
 
 fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.pdf')
 fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.pdf')
