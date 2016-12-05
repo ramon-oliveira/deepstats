@@ -120,12 +120,12 @@ traces = [out_mean, in_mean, deterministic, dropout, poor_bayesian, bayesian]
 traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'BD effect', 'OSBA effect', 'SV effect']
 fig_hist, figs_effects = bayesian_anova.plot_traces(traces, traces_name, show=False)
 
-# fig_hist.savefig(dataset+'_results/images/hist.pdf')
-# fig_effects.savefig(dataset+'_results/images/effects.pdf')
-fig_hist.savefig(dataset+'_results/images/hist.pdf')
+# fig_hist.savefig(dataset+'_results/images/hist.png')
+# fig_effects.savefig(dataset+'_results/images/effects.png')
+fig_hist.savefig(dataset+'_results/images/hist.png')
 for name, fig in figs_effects:
     name = name.lower().replace(' ', '_')
-    fig.savefig(dataset+'_results/images/'+name+'.pdf')
+    fig.savefig(dataset+'_results/images/'+name+'.png')
 
 
 fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'BD', 'ML', show=False)
@@ -136,10 +136,10 @@ fig_diff_os_bayes = bayesian_anova.effect_difference(poor_bayesian, bayesian, 'O
 fig_diff_drop_bayes = bayesian_anova.effect_difference(dropout, bayesian, 'BD', 'SV', show=False)
 fig_diff_iou_io = bayesian_anova.effect_difference(in_mean, out_mean, 'Calibrated', 'Blind', show=False)
 
-fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.pdf')
-fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.pdf')
-fig_diff_bayesian_ml.savefig(dataset+'_results/images/diff_bayesian_ml.pdf')
-fig_diff_os_drop.savefig(dataset+'_results/images/diff_os_drop.pdf')
-fig_diff_os_bayes.savefig(dataset+'_results/images/diff_os_bayes.pdf')
-fig_diff_drop_bayes.savefig(dataset+'_results/images/diff_drop_bayes.pdf')
-fig_diff_iou_io.savefig(dataset+'_results/images/diff_iou_io.pdf')
+fig_diff_drop_ml.savefig(dataset+'_results/images/diff_drop_ml.png')
+fig_diff_os_ml.savefig(dataset+'_results/images/diff_os_ml.png')
+fig_diff_bayesian_ml.savefig(dataset+'_results/images/diff_bayesian_ml.png')
+fig_diff_os_drop.savefig(dataset+'_results/images/diff_os_drop.png')
+fig_diff_os_bayes.savefig(dataset+'_results/images/diff_os_bayes.png')
+fig_diff_drop_bayes.savefig(dataset+'_results/images/diff_drop_bayes.png')
+fig_diff_iou_io.savefig(dataset+'_results/images/diff_iou_io.png')
