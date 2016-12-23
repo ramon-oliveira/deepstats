@@ -44,16 +44,12 @@ python plots_anova.py --dataset=mnist
 
 ### MNIST
 
-![Effects](mnist_results/images/effects.png "Effects")
-
 <img src="mnist_results/images/diff_iou_io.png" alt="Calibrated - Blind" width="24%"/>
 <img src="mnist_results/images/diff_drop_ml.png" alt="Dropout - ML" width="24%"/>
 <img src="mnist_results/images/diff_os_ml.png" alt="OneSample - ML" width="24%"/>
 <img src="mnist_results/images/diff_os_drop.png" alt="OneSample - Dropout" width="24%"/>
 
 ### CIFAR10 (Updated Results)
-
-![Effects](cifar10_results/images/effects.png "Effects")
 
 <img src="cifar10_results/images/diff_iou_io.png" alt="Calibrated - Blind" width="24%"/>
 <img src="cifar10_results/images/diff_drop_ml.png" alt="Dropout - ML" width="24%"/>
