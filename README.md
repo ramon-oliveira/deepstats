@@ -1,8 +1,10 @@
 # Known Unknowns: Uncertainty Quality in Bayesian Neural Networks
 
-This repository holds the code for the paper "Known Unknowns: Uncertainty Quality in Bayesian Neural Networks" submited to Bayesian Deep Learning NIPS Workshop.
+This repository holds the code for the paper "Known Unknowns: Uncertainty Quality in Bayesian Neural Networks" accepted to the Bayesian Deep Learning Workshop at NIPS 2016.
 
-Here we analyse the quality of uncertainty information provided by different Bayesian neural networks when contrasted standard deep learning models. We also propose a novel Bayesian approach for neural networks, similar to the variational approximation of Blundell et al., but much cheaper. We sample the weights only once per training mini-batch, leading to the same expected gradient, and trading off higher variance for computational efficiency (about 10 times faster with a mini-batch of 100). We call that approach One-Sample Bayesian Approximation (OSBA), and investigate whether it achieves better quality of uncertainty information than traditional maximum likelihood models. Techniques like Bayesian-Dropout and OSBA indeed provide better uncertainty information in a well-controlled dataset and deserve further investigation in more contexts. A challenge seems to be an adequate measure of uncertainty for uncontrolled datasets.
+Arxiv link: https://arxiv.org/abs/1612.01251
+
+We evaluate the uncertainty quality in neural networks using anomaly detection. We extract uncertainty measures (e.g. entropy) from the predictions of candidate models, use those measures as features for an anomaly detector, and gauge how well the detector differentiates known from unknown classes. We assign higher uncertainty quality to candidate models that lead to better detectors. We also propose a novel method for sampling a variational approximation of a Bayesian neural network, called One-Sample Bayesian Approximation (OSBA). We experiment on two datasets, MNIST and CIFAR10. We compare the following candidate neural network models: Maximum Likelihood, Bayesian Dropout, OSBA, and --- for MNIST --- the standard variational approximation. We show that Bayesian Dropout and OSBA provide better uncertainty information than Maximum Likelihood, and are essentially equivalent to the standard variational approximation, but much faster.
 
 ## Reproducing results (Python 3.5)
 
