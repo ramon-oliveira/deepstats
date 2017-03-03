@@ -90,15 +90,12 @@ out_acc = [nn_model+'_out_classifier_auc',
            nn_model+'-poor-bayesian_out_classifier_auc',
            nn_model+'-bayesian_out_classifier_auc']
 y_out = final_results[out_acc].values
-y_out = scipy.special.logit(y_out)
 
 in_acc = [nn_model+'_in_classifier_auc',
           nn_model+'-dropout_in_classifier_auc',
           nn_model+'-poor-bayesian_in_classifier_auc',
           nn_model+'-bayesian_in_classifier_auc']
 y_in = final_results[in_acc].values
-y_in = scipy.special.logit(y_in)
-
 
 model = pystan.StanModel(model_code=bayesian_anova.two_way_code)
 
@@ -109,24 +106,30 @@ fit = model.sampling(data=data, iter=100000, warmup = 10000, chains=4, thin=5)
 bayesian_anova.show_results(fit)
 
 trace = fit.extract()
-deterministic =  scipy.special.expit(trace['theta'][:,0])
-dropout = scipy.special.expit(trace['theta'][:,1])
-poor_bayesian = scipy.special.expit(trace['theta'][:,2])
-bayesian = scipy.special.expit(trace['theta'][:,3])
-in_mean = scipy.special.expit(trace['mu_in'])
-out_mean = scipy.special.expit(trace['mu_out'])
+deterministic =  trace['theta'][:,0]
+dropout = trace['theta'][:,1]
+poor_bayesian = trace['theta'][:,2]
+bayesian = trace['theta'][:,3]
+in_mean = trace['mu_in']
+out_mean = trace['mu_out']
 
 traces = [out_mean, in_mean, deterministic, dropout, poor_bayesian, bayesian]
 traces_name = ['Blind Mean', 'Calibrated Mean', 'ML effect', 'BD effect', 'OSBA effect', 'SV effect']
 fig_hist, figs_effects = bayesian_anova.plot_traces(traces, traces_name, show=False)
 
+<<<<<<< HEAD
 # fig_hist.savefig(dataset+'_results/images/hist.png')
 # fig_effects.savefig(dataset+'_results/images/effects.png')
+=======
+>>>>>>> c5ee8c1f199975dc77d03542a026ed1507016dcb
 fig_hist.savefig(dataset+'_results/images/hist.png')
 for name, fig in figs_effects:
     name = name.lower().replace(' ', '_')
     fig.savefig(dataset+'_results/images/'+name+'.png')
+<<<<<<< HEAD
 
+=======
+>>>>>>> c5ee8c1f199975dc77d03542a026ed1507016dcb
 
 fig_diff_drop_ml = bayesian_anova.effect_difference(dropout, deterministic, 'BD', 'ML', show=False)
 fig_diff_os_ml = bayesian_anova.effect_difference(poor_bayesian, deterministic, 'OSBA', 'ML', show=False)
